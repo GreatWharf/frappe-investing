@@ -88,8 +88,28 @@
 		Partial: "inv-pill-amber",
 	};
 
+	// Behaviour/test hook class (styling comes from native indicator-pill).
 	inv.statusPillClass = function (status) {
 		return STATUS_PILL[status] || "inv-pill-gray";
+	};
+
+	// Native Desk indicator colour for a status (used with .indicator-pill).
+	const STATUS_INDICATOR = {
+		Connected: "green",
+		Error: "red",
+		"Token Expired": "orange",
+		"Not Connected": "gray",
+		Posted: "green",
+		Failed: "red",
+		Pending: "orange",
+		Skipped: "gray",
+		"Not Applicable": "gray",
+		Success: "green",
+		Partial: "orange",
+	};
+
+	inv.statusIndicator = function (status) {
+		return STATUS_INDICATOR[status] || "gray";
 	};
 
 	// Desk form URL for a document, e.g. /app/investment-event/INV-0001.

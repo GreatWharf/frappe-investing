@@ -67,16 +67,14 @@ def sync_connection(name):
         if capabilities.get("positions"):
             positions = connector.positions()
             created["positions"] = len(positions)
-            created["prices"] = _store_quotes(connector, connection)
-        if capabilities.get("trades"):
-            for event in connector.events(since=connection.sync_cursor):
-                _name, was_created = record_event(_event_to_doc(connection, event))
-                created["events"] += int(was_created)
+            created["prices"] = _store_position_prices(positions, connection)
+        for event in _connector_events(connector, connection, capabilities):
+            _name, was_created = record_event(_event_to_doc(connection, event))
+            created["events"] += int(was_created)
+        log.events_created = created["events"]
+        log.positions_seen = created["positions"]
+        log.prices_seen = created["prices"]
         log.status = "Success"
-        frappe.db.set_value(
-            "Broker Connection", name, {"status": "Connected", "last_sync": now_datetime(), "last_error": ""}
-        )
-        return created
     except BrokerError as exc:
         status = "Token Expired" if exc.code in {"token_expired", "unauthorized"} else "Error"
         frappe.db.set_value("Broker Connection", name, {"status": status, "last_error": str(exc)})
@@ -95,6 +93,53 @@ def sync_connection(name):
             lock.release()
         except Exception:
             pass
+
+
+def _connector_events(connector, connection, capabilities):
+    """Dispatch to each connector's real event source. Unknown shapes are reported, not dropped."""
+    if connection.broker == "Zerodha":
+        return connector.todays_trades()
+    if connection.broker == "Alpaca":
+        result = connector.activities(after=connection.sync_cursor or None)
+        for row in result.get("skipped", []):
+            frappe.log_error(title=f"Alpaca activity skipped: {connection.name}", message=f"{row}")
+        return result["events"]
+    if connection.broker == "Interactive Brokers":
+        result = connector.fetch(connection.flex_query_id)
+        for row in result.get("errors", []):
+            frappe.log_error(title=f"IBKR Flex section not imported: {connection.name}", message=f"{row}")
+        return result["events"]
+    return []
+
+
+def _store_position_prices(positions, connection):
+    """Broker quotes come from holdings/positions last prices where available."""
+    count = 0
+    day = frappe.utils.today()
+    for position in positions:
+        if not position.get("market_price"):
+            continue
+        security = _resolve_security(position["security_key"], connection.company)
+        if frappe.db.exists("Security Price", {"security": security, "date": day}):
+            continue
+        frappe.flags.investing_internal = True
+        frappe.get_doc(
+            {
+                "doctype": "Security Price",
+                "security": security,
+                "date": day,
+                "close": position["market_price"],
+                "currency": position.get("currency") or _resolve_currency(connection),
+                "source": "Broker",
+            }
+        ).insert(ignore_permissions=True)
+        frappe.flags.investing_internal = False
+        count += 1
+    return count
+
+
+def _resolve_currency(connection):
+    return frappe.get_cached_value("Company", connection.company, "default_currency")
 
 
 def _event_to_doc(connection, event):
@@ -151,31 +196,6 @@ def _resolve_security(security_key, company):
         .name
     )
     return name
-
-
-def _store_quotes(connector, connection):
-    """Persist broker quotes as Security Prices where capabilities allow."""
-    if not connector.capabilities().get("quotes"):
-        return 0
-    count = 0
-    for quote in connector.quotes():
-        security = _resolve_security(quote["security_key"], connection.company)
-        if frappe.db.exists("Security Price", {"security": security, "date": quote["day"]}):
-            continue
-        frappe.flags.investing_internal = True
-        frappe.get_doc(
-            {
-                "doctype": "Security Price",
-                "security": security,
-                "date": quote["day"],
-                "close": quote["close"],
-                "currency": quote.get("currency"),
-                "source": "Broker",
-            }
-        ).insert(ignore_permissions=True)
-        frappe.flags.investing_internal = False
-        count += 1
-    return count
 
 
 def refresh_prices(provider=None, securities=None):

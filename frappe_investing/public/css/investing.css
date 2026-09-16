@@ -1,9 +1,12 @@
 /* Frappe Investing — Desk styles.
  *
- * Palette comes exclusively from Frappe CSS variables, so dark mode and
- * custom themes are honoured without any media-query overrides of our own.
- * Signed values are colour-coded purely through .inv-pos / .inv-neg classes;
- * no inline colours anywhere in the JS.
+ * The page must be indistinguishable from native Desk: every colour comes
+ * from runtime Frappe theme variables (dark mode and custom themes work
+ * untouched), controls use native .btn / .form-control / .indicator-pill
+ * classes, and there is no custom branding, no decorative focus or click
+ * rings, and no nested card frames. The classes defined here only cover what
+ * Desk has no native component for (KPI grid, allocation bars, tables,
+ * connection rows), styled with theme tokens.
  */
 
 .inv-root {
@@ -16,24 +19,29 @@
 .inv-toolbar {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: flex-end;
+	align-items: center;
 	gap: var(--padding-sm) var(--padding-md);
 	margin-bottom: var(--padding-lg);
 }
 
+/* Label and select share one line so adjacent controls keep equal heights. */
 .inv-toolbar .inv-portfolio-picker {
 	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	min-width: 200px;
-	flex: 1 1 200px;
-	max-width: 340px;
+	align-items: center;
+	gap: var(--padding-sm);
+	min-width: 0;
 }
 
-.inv-toolbar label {
-	font-size: var(--text-sm);
+.inv-toolbar .inv-portfolio-picker label {
 	color: var(--text-muted);
 	margin-bottom: 0;
+	white-space: nowrap;
+}
+
+.inv-toolbar .inv-portfolio-picker select.form-control {
+	width: auto;
+	min-width: 180px;
+	max-width: 320px;
 }
 
 .inv-toolbar .inv-actions {
@@ -66,6 +74,14 @@
 	margin-bottom: var(--padding-md);
 }
 
+/* Plain page note (intro text): no frame, just muted text. */
+.inv-page-note {
+	color: var(--text-muted);
+	max-width: 720px;
+	line-height: 1.6;
+	margin: 0 0 var(--padding-lg);
+}
+
 /* ---------------------------------------------------------------- KPIs */
 .inv-kpis {
 	display: grid;
@@ -74,6 +90,7 @@
 	margin-bottom: var(--padding-lg);
 }
 
+/* Same shape as Desk number cards: card-bg + border, directly on the page. */
 .inv-kpi {
 	background: var(--card-bg);
 	border: 1px solid var(--border-color);
@@ -101,7 +118,7 @@
 	margin-top: 4px;
 }
 
-/* ------------------------------------------------------------- signed */
+/* -------------------------------------------------- signed value hooks */
 .inv-pos {
 	color: var(--green-600);
 }
@@ -114,46 +131,9 @@
 	color: var(--text-muted);
 }
 
-/* ------------------------------------------------------------- pills */
-.inv-pill {
-	display: inline-block;
-	padding: 2px 10px;
-	border-radius: 999px;
-	font-size: var(--text-xs, 11px);
-	font-weight: 600;
-	line-height: 1.6;
-	white-space: nowrap;
-}
-
-.inv-pill-green {
-	color: var(--green-700);
-	background: var(--bg-green);
-}
-
-.inv-pill-red {
-	color: var(--red-700);
-	background: var(--bg-red);
-}
-
-.inv-pill-amber {
-	color: var(--yellow-700);
-	background: var(--bg-yellow);
-}
-
-.inv-pill-gray {
-	color: var(--gray-700);
-	background: var(--bg-light-gray);
-}
-
-.inv-badge-stale {
-	display: inline-block;
-	padding: 1px 8px;
-	border-radius: 999px;
-	font-size: var(--text-xs, 11px);
-	font-weight: 600;
-	color: var(--yellow-700);
-	background: var(--bg-yellow);
-}
+/* Status pills use native .indicator-pill classes from JS; the inv-pill /
+ * inv-pill-* / inv-badge-stale classes are behaviour/test hooks only and
+ * intentionally carry no styling of their own. */
 
 /* ---------------------------------------------------------- allocation */
 .inv-alloc-row {
@@ -178,8 +158,9 @@
 	color: var(--text-muted);
 }
 
+/* Same shape as native Desk progress bars; fill is the theme primary. */
 .inv-alloc-track {
-	height: 10px;
+	height: 8px;
 	border-radius: 999px;
 	background: var(--control-bg, var(--bg-light-gray));
 	overflow: hidden;
@@ -189,14 +170,8 @@
 	height: 100%;
 	border-radius: 999px;
 	min-width: 2px;
+	background: var(--primary);
 }
-
-/* Bar colours rotate through theme hues; dark mode is handled by the vars. */
-.inv-bar-0 { background: var(--blue-500); }
-.inv-bar-1 { background: var(--green-500); }
-.inv-bar-2 { background: var(--purple-500, var(--blue-300)); }
-.inv-bar-3 { background: var(--orange-500, var(--yellow-500)); }
-.inv-bar-4 { background: var(--pink-500, var(--red-300)); }
 
 /* -------------------------------------------------------------- tables */
 .inv-table-wrap {
@@ -241,6 +216,8 @@ table.inv-table tbody tr:hover {
 	background: var(--control-bg, var(--bg-light-gray));
 }
 
+/* Header sort control: invisible until hovered/focused, keyboard focus uses
+ * :focus-visible only (no decorative mouse ring). */
 .inv-sort-btn {
 	background: none;
 	border: 0;
@@ -256,7 +233,7 @@ table.inv-table tbody tr:hover {
 }
 
 .inv-sort-btn:focus-visible {
-	outline: 2px solid var(--focus-color, var(--blue-500));
+	outline: 2px solid var(--blue-500);
 	outline-offset: 2px;
 	border-radius: 2px;
 }
@@ -329,26 +306,24 @@ table.inv-table tbody tr:hover {
 	background: var(--bg-yellow);
 }
 
+/* Upsell is a plain row — text plus a link, no frame. */
 .inv-upsell {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--padding-sm);
 	flex-wrap: wrap;
-	padding: var(--padding-sm) var(--padding-md);
-	border: 1px dashed var(--border-color);
-	border-radius: var(--border-radius-lg, 12px);
+	padding: var(--padding-sm) 0;
 	margin-bottom: var(--padding-lg);
 	font-size: var(--text-sm);
+	color: var(--text-muted);
 }
 
-/* ------------------------------------------------------- empty / lists */
+/* ------------------------------------------------------------- empty */
+/* Native-style empty state: centred text on the page background, no card. */
 .inv-empty {
 	text-align: center;
 	padding: 48px 20px;
-	background: var(--card-bg);
-	border: 1px dashed var(--border-color);
-	border-radius: var(--border-radius-lg, 12px);
 	margin-bottom: var(--padding-lg);
 }
 
@@ -402,6 +377,7 @@ table.inv-table tbody tr:hover {
 	gap: var(--padding-md);
 }
 
+/* One level of card on the page background — never nested inside a card. */
 .inv-broker-card {
 	background: var(--card-bg);
 	border: 1px solid var(--border-color);
@@ -429,26 +405,6 @@ table.inv-table tbody tr:hover {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
-}
-
-.inv-badge {
-	display: inline-block;
-	padding: 2px 10px;
-	border-radius: 999px;
-	font-size: var(--text-xs, 11px);
-	font-weight: 600;
-	background: var(--bg-light-gray);
-	color: var(--gray-700);
-}
-
-.inv-badge-yes {
-	background: var(--bg-green);
-	color: var(--green-700);
-}
-
-.inv-badge-warn {
-	background: var(--bg-yellow);
-	color: var(--yellow-700);
 }
 
 .inv-broker-card .inv-broker-actions {
@@ -479,15 +435,6 @@ table.inv-table tbody tr:hover {
 .inv-existing .inv-conn-row .inv-conn-title {
 	font-weight: 600;
 	margin-right: 8px;
-}
-
-.inv-token-box {
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-	padding: var(--padding-sm);
-	display: flex;
-	flex-direction: column;
-	gap: var(--padding-sm);
 }
 
 /* ------------------------------------------------------------- narrow */
@@ -526,5 +473,10 @@ table.inv-table tbody tr:hover {
 
 	.inv-alloc-row {
 		grid-template-columns: minmax(70px, 100px) 1fr minmax(48px, auto);
+	}
+
+	.inv-toolbar .inv-portfolio-picker select.form-control {
+		min-width: 0;
+		flex: 1;
 	}
 }

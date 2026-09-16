@@ -335,7 +335,6 @@
 				$('<span class="inv-alloc-label">').text(label).appendTo(row);
 				const track = $('<div class="inv-alloc-track">').appendTo(row);
 				$('<div class="inv-alloc-fill">')
-					.addClass(`inv-bar-${i % 5}`)
 					.css("width", `${Math.min(100, Math.max(0, pct))}%`)
 					.attr("role", "img")
 					.attr("aria-label", `${label} ${pct}%`)
@@ -434,7 +433,7 @@
 				$("<td>").addClass("inv-num").text(row.qty === null ? "—" : inv.formatQty(row.qty)).appendTo(tr2);
 				const priceTd = $("<td>").addClass("inv-num").appendTo(tr2);
 				if (row.stale) {
-					$('<span class="inv-badge-stale">').text(__("Stale")).appendTo(priceTd);
+					$('<span class="indicator-pill yellow inv-badge-stale">').text(__("Stale")).appendTo(priceTd);
 				} else {
 					priceTd.text(row.price === null ? "—" : inv.formatMoney(row.price, values.base));
 				}
@@ -469,11 +468,12 @@
 					.appendTo(main);
 				const side = $('<div class="inv-conn-side">').appendTo(row);
 				$('<span class="inv-pill">')
+					.addClass(`indicator-pill ${inv.statusIndicator(conn.status)}`)
 					.addClass(inv.statusPillClass(conn.status))
 					.text(conn.status || __("Not Connected"))
 					.appendTo(side);
 				if (!conn.enabled) {
-					$('<span class="inv-pill inv-pill-gray">').text(__("Disabled")).appendTo(side);
+					$('<span class="indicator-pill gray inv-pill inv-pill-gray">').text(__("Disabled")).appendTo(side);
 				}
 				if (inv.isManager()) {
 					const btn = $('<button type="button" class="btn btn-default btn-sm">')
@@ -614,6 +614,7 @@
 					.appendTo(row);
 				const statusTd = $("<td>").appendTo(row);
 				$('<span class="inv-pill">')
+					.addClass(`indicator-pill ${inv.statusIndicator(event.accounting_status)}`)
 					.addClass(inv.statusPillClass(event.accounting_status))
 					.text(event.accounting_status || __("Pending"))
 					.appendTo(statusTd);
