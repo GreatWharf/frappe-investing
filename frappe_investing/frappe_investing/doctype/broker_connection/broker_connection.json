@@ -1,0 +1,151 @@
+{
+  "doctype": "DocType",
+  "name": "Broker Connection",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "connection_name",
+      "label": "Connection Name",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "broker",
+      "label": "Broker",
+      "fieldtype": "Select",
+      "options": "Zerodha\nAlpaca\nInteractive Brokers\nCSV Import",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "credentials",
+      "label": "Credentials",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "api_key",
+      "label": "Api Key",
+      "fieldtype": "Password"
+    },
+    {
+      "fieldname": "api_secret",
+      "label": "Api Secret",
+      "fieldtype": "Password"
+    },
+    {
+      "fieldname": "access_token",
+      "label": "Access Token",
+      "fieldtype": "Password"
+    },
+    {
+      "fieldname": "flex_token",
+      "label": "Flex Token",
+      "fieldtype": "Password"
+    },
+    {
+      "fieldname": "flex_query_id",
+      "label": "Flex Query Id",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "sandbox",
+      "label": "Sandbox",
+      "fieldtype": "Check",
+      "default": "0"
+    },
+    {
+      "fieldname": "sync",
+      "label": "Sync",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "enabled",
+      "label": "Enabled",
+      "fieldtype": "Check",
+      "default": "0"
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "options": "Not Connected\nConnected\nError\nToken Expired",
+      "default": "Not Connected",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_sync",
+      "label": "Last Sync",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_error",
+      "label": "Last Error",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
+      "fieldname": "sync_cursor",
+      "label": "Sync Cursor",
+      "fieldtype": "Data",
+      "read_only": 1
+    }
+  ],
+  "field_order": [
+    "connection_name",
+    "broker",
+    "company",
+    "credentials",
+    "api_key",
+    "api_secret",
+    "access_token",
+    "flex_token",
+    "flex_query_id",
+    "sandbox",
+    "sync",
+    "enabled",
+    "status",
+    "last_sync",
+    "last_error",
+    "sync_cursor"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "title_field": "connection_name"
+}

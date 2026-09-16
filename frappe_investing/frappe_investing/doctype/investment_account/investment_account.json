@@ -1,0 +1,93 @@
+{
+  "doctype": "DocType",
+  "name": "Investment Account",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "account_name",
+      "label": "Account Name",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "portfolio",
+      "label": "Portfolio",
+      "fieldtype": "Link",
+      "options": "Portfolio",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "broker_connection",
+      "label": "Broker Connection",
+      "fieldtype": "Link",
+      "options": "Broker Connection"
+    },
+    {
+      "fieldname": "currency",
+      "label": "Currency",
+      "fieldtype": "Link",
+      "options": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "external_id",
+      "label": "External Id",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "broker_cash_account",
+      "label": "Broker Cash Account",
+      "fieldtype": "Link",
+      "options": "Account",
+      "description": "ERPNext GL account holding this broker account's cash."
+    },
+    {
+      "fieldname": "enabled",
+      "label": "Enabled",
+      "fieldtype": "Check",
+      "default": "1"
+    }
+  ],
+  "field_order": [
+    "account_name",
+    "portfolio",
+    "broker_connection",
+    "currency",
+    "external_id",
+    "broker_cash_account",
+    "enabled"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "title_field": "account_name"
+}

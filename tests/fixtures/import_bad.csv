@@ -1,0 +1,7 @@
+date,type,security_key,qty,price,amount,gross,fees,taxes,currency,source_ref
+2026-01-15,Buy,US:AAPL,10,190.25,,,1.00,0,USD,BAD-OK
+2026-13-40,Buy,US:AAPL,10,190.25,,,1.00,0,USD,BAD-DATE
+2026-01-16,Buy,US:AAPL,-5,190.25,,,1.00,0,USD,BAD-QTY
+2026-01-17,Buy,US:AAPL,10,not-a-number,,,1.00,0,USD,BAD-PRICE
+2026-01-18,Bogus,US:AAPL,10,10,,,0,0,USD,BAD-TYPE
+2026-01-19,Dividend,US:AAPL,,,,,0,0,USD,BAD-GROSS

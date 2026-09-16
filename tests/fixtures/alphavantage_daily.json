@@ -1,0 +1,25 @@
+{
+  "Meta Data": {
+    "1. Information": "Daily Prices (open, high, low, close) and Volumes",
+    "2. Symbol": "AAPL",
+    "3. Last Refreshed": "2026-09-15",
+    "4. Output Size": "Compact",
+    "5. Time Zone": "US/Eastern"
+  },
+  "Time Series (Daily)": {
+    "2026-09-15": {
+      "1. open": "189.50",
+      "2. high": "192.10",
+      "3. low": "189.10",
+      "4. close": "191.70",
+      "5. volume": "52341100"
+    },
+    "2026-09-14": {
+      "1. open": "188.00",
+      "2. high": "190.00",
+      "3. low": "187.50",
+      "4. close": "189.45",
+      "5. volume": "48123000"
+    }
+  }
+}

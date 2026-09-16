@@ -1,0 +1,16 @@
+{
+  "id": "9f0c2f5e-7c2a-4d3c-8f2a-1b2c3d4e5f60",
+  "account_number": "PA1234567",
+  "status": "ACTIVE",
+  "crypto_status": "INACTIVE",
+  "currency": "USD",
+  "cash": "10000.00",
+  "portfolio_value": "13590.40",
+  "pattern_day_trader": false,
+  "trading_blocked": false,
+  "transfers_blocked": false,
+  "account_blocked": false,
+  "created_at": "2026-01-05T14:00:00Z",
+  "shorting_enabled": false,
+  "multiplier": "1"
+}

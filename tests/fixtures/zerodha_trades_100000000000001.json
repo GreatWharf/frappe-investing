@@ -1,0 +1,20 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "trade_id": "50000001",
+      "order_id": "100000000000001",
+      "exchange": "NSE",
+      "tradingsymbol": "RELIANCE",
+      "instrument_token": 738561,
+      "product": "CNC",
+      "average_price": 2450.5,
+      "quantity": 10,
+      "exchange_order_id": "1300000000000001",
+      "transaction_type": "BUY",
+      "fill_timestamp": "2026-09-16 09:16:39",
+      "order_timestamp": "2026-09-16 09:16:39",
+      "exchange_timestamp": "2026-09-16 09:16:39"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "doctype": "DocType",
+  "name": "Investment Accounting Policy",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "mode",
+      "label": "Mode",
+      "fieldtype": "Select",
+      "options": "Off\nDraft\nSubmit",
+      "default": "Draft"
+    },
+    {
+      "fieldname": "mappings",
+      "label": "Mappings",
+      "fieldtype": "Table",
+      "options": "Policy Mapping"
+    }
+  ],
+  "field_order": [
+    "company",
+    "mode",
+    "mappings"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "title_field": "company"
+}

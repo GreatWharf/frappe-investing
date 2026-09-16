@@ -1,0 +1,35 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "trade_id": "50000002",
+      "order_id": "100000000000002",
+      "exchange": "NSE",
+      "tradingsymbol": "TCS",
+      "instrument_token": 2953217,
+      "product": "CNC",
+      "average_price": 3120.4,
+      "quantity": 3,
+      "exchange_order_id": "1300000000000002",
+      "transaction_type": "SELL",
+      "fill_timestamp": "2026-09-16 10:01:02",
+      "order_timestamp": "2026-09-16 10:01:02",
+      "exchange_timestamp": "2026-09-16 10:01:02"
+    },
+    {
+      "trade_id": "50000003",
+      "order_id": "100000000000002",
+      "exchange": "NSE",
+      "tradingsymbol": "TCS",
+      "instrument_token": 2953217,
+      "product": "CNC",
+      "average_price": 3121.0,
+      "quantity": 2,
+      "exchange_order_id": "1300000000000002",
+      "transaction_type": "SELL",
+      "fill_timestamp": "2026-09-16 10:01:03",
+      "order_timestamp": "2026-09-16 10:01:02",
+      "exchange_timestamp": "2026-09-16 10:01:03"
+    }
+  ]
+}

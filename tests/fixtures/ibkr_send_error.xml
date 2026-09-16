@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexWebServiceResponse>
+  <ResponseCode>1012</ResponseCode>
+  <ResponseText>Request denied for token tok3nXYZ123: invalid query id</ResponseText>
+</FlexWebServiceResponse>

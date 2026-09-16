@@ -1,0 +1,97 @@
+{
+  "doctype": "DocType",
+  "name": "Import Batch",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "source",
+      "label": "Source",
+      "fieldtype": "Select",
+      "options": "CSV Import\nInteractive Brokers",
+      "reqd": 1
+    },
+    {
+      "fieldname": "import_file",
+      "label": "Import File",
+      "fieldtype": "Attach"
+    },
+    {
+      "fieldname": "account",
+      "label": "Account",
+      "fieldtype": "Link",
+      "options": "Investment Account",
+      "reqd": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "options": "Draft\nDry Run\nImported\nFailed",
+      "default": "Draft"
+    },
+    {
+      "fieldname": "total_rows",
+      "label": "Total Rows",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "imported",
+      "label": "Imported",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "failed",
+      "label": "Failed",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "errors",
+      "label": "Errors",
+      "fieldtype": "Table",
+      "options": "Import Error"
+    }
+  ],
+  "field_order": [
+    "source",
+    "import_file",
+    "account",
+    "status",
+    "total_rows",
+    "imported",
+    "failed",
+    "errors"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

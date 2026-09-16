@@ -1,0 +1,91 @@
+{
+  "doctype": "DocType",
+  "name": "Broker Sync Log",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "connection",
+      "label": "Connection",
+      "fieldtype": "Link",
+      "options": "Broker Connection",
+      "reqd": 1
+    },
+    {
+      "fieldname": "started_at",
+      "label": "Started At",
+      "fieldtype": "Datetime"
+    },
+    {
+      "fieldname": "finished_at",
+      "label": "Finished At",
+      "fieldtype": "Datetime"
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "options": "Success\nFailed\nPartial"
+    },
+    {
+      "fieldname": "events_created",
+      "label": "Events Created",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "positions_seen",
+      "label": "Positions Seen",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "prices_seen",
+      "label": "Prices Seen",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "error",
+      "label": "Error",
+      "fieldtype": "Long Text"
+    }
+  ],
+  "field_order": [
+    "connection",
+    "started_at",
+    "finished_at",
+    "status",
+    "events_created",
+    "positions_seen",
+    "prices_seen",
+    "error"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

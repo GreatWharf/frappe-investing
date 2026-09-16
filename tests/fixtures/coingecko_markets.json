@@ -1,0 +1,5 @@
+[
+  {"id": "bitcoin", "symbol": "btc", "name": "Bitcoin", "current_price": 112345.67, "market_cap": 2230000000000},
+  {"id": "ethereum", "symbol": "eth", "name": "Ethereum", "current_price": 4567.89, "market_cap": 549000000000},
+  {"id": "solana", "symbol": "sol", "name": "Solana", "current_price": 210.5, "market_cap": 98000000000}
+]

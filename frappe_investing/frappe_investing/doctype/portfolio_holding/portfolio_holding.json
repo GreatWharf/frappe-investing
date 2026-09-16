@@ -1,0 +1,63 @@
+{
+  "doctype": "DocType",
+  "name": "Portfolio Holding",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 1,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "security",
+      "label": "Security",
+      "fieldtype": "Link",
+      "options": "Security",
+      "reqd": 1
+    },
+    {
+      "fieldname": "qty",
+      "label": "Qty",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "price",
+      "label": "Price",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "value",
+      "label": "Value",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "cost",
+      "label": "Cost",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "unrealized_pnl",
+      "label": "Unrealized Pnl",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "currency",
+      "label": "Currency",
+      "fieldtype": "Link",
+      "options": "Currency"
+    }
+  ],
+  "field_order": [
+    "security",
+    "qty",
+    "price",
+    "value",
+    "cost",
+    "unrealized_pnl",
+    "currency"
+  ],
+  "permissions": [],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

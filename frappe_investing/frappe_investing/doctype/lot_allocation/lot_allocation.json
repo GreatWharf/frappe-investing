@@ -1,0 +1,87 @@
+{
+  "doctype": "DocType",
+  "name": "Lot Allocation",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "event",
+      "label": "Event",
+      "fieldtype": "Link",
+      "options": "Investment Event",
+      "reqd": 1
+    },
+    {
+      "fieldname": "lot",
+      "label": "Lot",
+      "fieldtype": "Link",
+      "options": "Tax Lot",
+      "reqd": 1
+    },
+    {
+      "fieldname": "qty",
+      "label": "Qty",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "cost",
+      "label": "Cost",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "proceeds",
+      "label": "Proceeds",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "realized_pnl",
+      "label": "Realized Pnl",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "acquired",
+      "label": "Acquired",
+      "fieldtype": "Date"
+    }
+  ],
+  "field_order": [
+    "event",
+    "lot",
+    "qty",
+    "cost",
+    "proceeds",
+    "realized_pnl",
+    "acquired"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

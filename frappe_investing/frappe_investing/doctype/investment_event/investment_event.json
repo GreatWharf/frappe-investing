@@ -1,0 +1,257 @@
+{
+  "doctype": "DocType",
+  "name": "Investment Event",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 1,
+  "fields": [
+    {
+      "fieldname": "event_type",
+      "label": "Event Type",
+      "fieldtype": "Select",
+      "options": "Buy\nSell\nDividend\nCoupon\nInterest\nFee\nDeposit\nWithdrawal\nTransfer In\nTransfer Out\nSplit\nReverse Split\nStock Dividend\nSpin-off\nCash-in-lieu\nRedemption\nFX Conversion",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "posting_date",
+      "label": "Posting Date",
+      "fieldtype": "Date",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "account",
+      "label": "Account",
+      "fieldtype": "Link",
+      "options": "Investment Account",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "security",
+      "label": "Security",
+      "fieldtype": "Link",
+      "options": "Security"
+    },
+    {
+      "fieldname": "amounts",
+      "label": "Amounts",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "qty",
+      "label": "Qty",
+      "fieldtype": "Data",
+      "description": "Decimal quantity; always positive."
+    },
+    {
+      "fieldname": "price",
+      "label": "Price",
+      "fieldtype": "Data",
+      "description": "Per-unit price in the event currency (clean price for bonds)."
+    },
+    {
+      "fieldname": "amount",
+      "label": "Amount",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "gross",
+      "label": "Gross",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "fees",
+      "label": "Fees",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "taxes",
+      "label": "Taxes",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "accrued_interest",
+      "label": "Accrued Interest",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "currency",
+      "label": "Currency",
+      "fieldtype": "Link",
+      "options": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "corporate_action",
+      "label": "Corporate Action",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "split_ratio",
+      "label": "Split Ratio",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "basis_allocation",
+      "label": "Basis Allocation",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "child_ratio",
+      "label": "Child Ratio",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "child_security",
+      "label": "Child Security",
+      "fieldtype": "Link",
+      "options": "Security"
+    },
+    {
+      "fieldname": "lot_ids",
+      "label": "Lot Ids",
+      "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "fx",
+      "label": "Fx",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "target_currency",
+      "label": "Target Currency",
+      "fieldtype": "Link",
+      "options": "Currency"
+    },
+    {
+      "fieldname": "target_amount",
+      "label": "Target Amount",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "provenance",
+      "label": "Provenance",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "source",
+      "label": "Source",
+      "fieldtype": "Select",
+      "options": "Manual\nZerodha\nAlpaca\nInteractive Brokers\nCSV Import",
+      "default": "Manual",
+      "reqd": 1
+    },
+    {
+      "fieldname": "source_ref",
+      "label": "Source Ref",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "dedupe_key",
+      "label": "Dedupe Key",
+      "fieldtype": "Data",
+      "unique": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "reversal_of",
+      "label": "Reversal Of",
+      "fieldtype": "Link",
+      "options": "Investment Event",
+      "read_only": 1
+    },
+    {
+      "fieldname": "journal_entry",
+      "label": "Journal Entry",
+      "fieldtype": "Link",
+      "options": "Journal Entry",
+      "read_only": 1
+    },
+    {
+      "fieldname": "accounting_status",
+      "label": "Accounting Status",
+      "fieldtype": "Select",
+      "options": "Pending\nPosted\nSkipped\nFailed\nNot Applicable",
+      "default": "Pending",
+      "read_only": 1
+    },
+    {
+      "fieldname": "meta_json",
+      "label": "Meta Json",
+      "fieldtype": "Long Text",
+      "hidden": 1
+    },
+    {
+      "fieldname": "notes",
+      "label": "Notes",
+      "fieldtype": "Small Text"
+    }
+  ],
+  "field_order": [
+    "event_type",
+    "posting_date",
+    "account",
+    "security",
+    "amounts",
+    "qty",
+    "price",
+    "amount",
+    "gross",
+    "fees",
+    "taxes",
+    "accrued_interest",
+    "currency",
+    "corporate_action",
+    "split_ratio",
+    "basis_allocation",
+    "child_ratio",
+    "child_security",
+    "lot_ids",
+    "fx",
+    "target_currency",
+    "target_amount",
+    "provenance",
+    "source",
+    "source_ref",
+    "dedupe_key",
+    "reversal_of",
+    "journal_entry",
+    "accounting_status",
+    "meta_json",
+    "notes"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "submit": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1,
+      "cancel": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

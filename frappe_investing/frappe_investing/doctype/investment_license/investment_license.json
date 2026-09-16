@@ -1,0 +1,82 @@
+{
+  "doctype": "DocType",
+  "name": "Investment License",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 1,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "license_key",
+      "label": "License Key",
+      "fieldtype": "Long Text"
+    },
+    {
+      "fieldname": "tier",
+      "label": "Tier",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "customer",
+      "label": "Customer",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "expires",
+      "label": "Expires",
+      "fieldtype": "Date",
+      "read_only": 1
+    },
+    {
+      "fieldname": "validated_at",
+      "label": "Validated At",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "status_note",
+      "label": "Status Note",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    }
+  ],
+  "field_order": [
+    "license_key",
+    "tier",
+    "status",
+    "customer",
+    "expires",
+    "validated_at",
+    "status_note"
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1
+    },
+    {
+      "role": "Investment User",
+      "read": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

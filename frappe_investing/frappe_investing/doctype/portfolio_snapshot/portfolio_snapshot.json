@@ -1,0 +1,116 @@
+{
+  "doctype": "DocType",
+  "name": "Portfolio Snapshot",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "portfolio",
+      "label": "Portfolio",
+      "fieldtype": "Link",
+      "options": "Portfolio",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "date",
+      "label": "Date",
+      "fieldtype": "Date",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "base_currency",
+      "label": "Base Currency",
+      "fieldtype": "Link",
+      "options": "Currency"
+    },
+    {
+      "fieldname": "total_value",
+      "label": "Total Value",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "total_cost",
+      "label": "Total Cost",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "unrealized_pnl",
+      "label": "Unrealized Pnl",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "realized_pnl_period",
+      "label": "Realized Pnl Period",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "income_period",
+      "label": "Income Period",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "external_flow",
+      "label": "External Flow",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "twr_period",
+      "label": "Twr Period",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "xirr_period",
+      "label": "Xirr Period",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "holdings",
+      "label": "Holdings",
+      "fieldtype": "Table",
+      "options": "Portfolio Holding"
+    }
+  ],
+  "field_order": [
+    "portfolio",
+    "date",
+    "base_currency",
+    "total_value",
+    "total_cost",
+    "unrealized_pnl",
+    "realized_pnl_period",
+    "income_period",
+    "external_flow",
+    "twr_period",
+    "xirr_period",
+    "holdings"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

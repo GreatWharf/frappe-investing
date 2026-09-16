@@ -1,0 +1,76 @@
+{
+  "doctype": "DocType",
+  "name": "Security Price",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "security",
+      "label": "Security",
+      "fieldtype": "Link",
+      "options": "Security",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "date",
+      "label": "Date",
+      "fieldtype": "Date",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "close",
+      "label": "Close",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "currency",
+      "label": "Currency",
+      "fieldtype": "Link",
+      "options": "Currency"
+    },
+    {
+      "fieldname": "source",
+      "label": "Source",
+      "fieldtype": "Select",
+      "options": "Manual\nStooq\nBroker\nAlpha Vantage\nCoinGecko",
+      "default": "Manual"
+    }
+  ],
+  "field_order": [
+    "security",
+    "date",
+    "close",
+    "currency",
+    "source"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

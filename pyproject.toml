@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frappe_investing"
+version = "0.1.0"
+description = "Investment management for ERPNext: portfolios, broker sync, corporate actions, performance and accounting"
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+license = "MIT"
+authors = [{name = "Merrick", email = "Merrick@greatwharf.com"}]
+dependencies = ["requests>=2.31,<3", "cryptography>=42,<51"]
+
+[project.urls]
+Homepage = "https://github.com/GreatWharf/frappe-investing"
+Documentation = "https://github.com/GreatWharf/frappe-investing/tree/main/docs"
+Issues = "https://github.com/GreatWharf/frappe-investing/issues"
+
+[project.optional-dependencies]
+test = ["pytest>=8.4,<10", "ruff>=0.14", "build>=1,<2", "tomli>=2,<3; python_version < '3.11'"]
+
+[tool.setuptools.packages.find]
+include = ["frappe_investing*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.js", "*.css", "*.txt", "*.svg", "*.html", "*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+# Frappe Cloud requires a STABLE upper bound; a prerelease ceiling is rejected.
+[tool.bench.frappe-dependencies]
+frappe = ">=15.0.0-dev,<17.0.0"

@@ -1,0 +1,18 @@
+{
+  "status": "success",
+  "data": {
+    "user_id": "AB1234",
+    "user_name": "Test User",
+    "user_shortname": "Test",
+    "email": "test@example.com",
+    "user_type": "individual",
+    "broker": "ZERODHA",
+    "exchanges": ["NSE", "BSE"],
+    "products": ["CNC", "MIS"],
+    "order_types": ["MARKET", "LIMIT"],
+    "login_time": "2026-09-16 08:16:39",
+    "access_token": "acc3ssT0k3nValue",
+    "public_token": "pubt0k3n",
+    "refresh_token": ""
+  }
+}

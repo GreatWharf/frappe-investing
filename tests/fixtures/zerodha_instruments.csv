@@ -1,0 +1,4 @@
+instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange
+738561,2882,RELIANCE,RELIANCE INDUSTRIES,2501.75,,0,0.05,1,EQ,NSE,NSE
+8345343,32586,HDFCBANK,HDFC BANK,1640.00,,0,0.05,1,EQ,NSE,NSE
+128028932,500111,INFY26SEP1500CE,INFY 1500 CE,45.30,2026-09-24,1500,0.05,400,CE,NFO-OPT,NFO

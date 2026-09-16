@@ -1,0 +1,53 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "tradingsymbol": "RELIANCE",
+      "exchange": "NSE",
+      "instrument_token": 738561,
+      "isin": "INE002A01018",
+      "product": "CNC",
+      "price": 0,
+      "quantity": 10,
+      "used_quantity": 0,
+      "t1_quantity": 0,
+      "realised_quantity": 10,
+      "authorised_quantity": 0,
+      "authorised_date": "2026-09-16",
+      "opening_quantity": 10,
+      "short_quantity": 0,
+      "collateral_quantity": 0,
+      "collateral_type": "",
+      "average_price": 2450.5,
+      "last_price": 2501.75,
+      "close_price": 2490.0,
+      "pnl": 512.5,
+      "day_change": 11.75,
+      "day_change_percentage": 0.47
+    },
+    {
+      "tradingsymbol": "TCS",
+      "exchange": "BSE",
+      "instrument_token": 2953217,
+      "isin": "INE467B01029",
+      "product": "CNC",
+      "price": 0,
+      "quantity": 5,
+      "used_quantity": 0,
+      "t1_quantity": 2,
+      "realised_quantity": 5,
+      "authorised_quantity": 0,
+      "authorised_date": "2026-09-16",
+      "opening_quantity": 5,
+      "short_quantity": 0,
+      "collateral_quantity": 0,
+      "collateral_type": "",
+      "average_price": 3100.0,
+      "last_price": 3150.25,
+      "close_price": 3140.0,
+      "pnl": 251.25,
+      "day_change": 10.25,
+      "day_change_percentage": 0.33
+    }
+  ]
+}

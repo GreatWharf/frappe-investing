@@ -1,0 +1,71 @@
+{
+  "doctype": "DocType",
+  "name": "Exchange",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "exchange_code",
+      "label": "Exchange Code",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "description": "MIC-style code, e.g. XNAS, XNSE, NSE"
+    },
+    {
+      "fieldname": "exchange_name",
+      "label": "Exchange Name",
+      "fieldtype": "Data",
+      "reqd": 1
+    },
+    {
+      "fieldname": "currency",
+      "label": "Currency",
+      "fieldtype": "Link",
+      "options": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "timezone",
+      "label": "Timezone",
+      "fieldtype": "Data",
+      "default": "UTC"
+    }
+  ],
+  "field_order": [
+    "exchange_code",
+    "exchange_name",
+    "currency",
+    "timezone"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "title_field": "exchange_name"
+}

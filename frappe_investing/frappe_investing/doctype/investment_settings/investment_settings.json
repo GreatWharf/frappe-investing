@@ -1,0 +1,90 @@
+{
+  "doctype": "DocType",
+  "name": "Investment Settings",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 1,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "default_cost_method",
+      "label": "Default Cost Method",
+      "fieldtype": "Select",
+      "options": "FIFO\nLIFO\nAVERAGE\nSPECIFIC",
+      "default": "FIFO",
+      "reqd": 1
+    },
+    {
+      "fieldname": "auto_accounting",
+      "label": "Auto Accounting",
+      "fieldtype": "Select",
+      "options": "Off\nDraft\nSubmit",
+      "default": "Draft",
+      "reqd": 1,
+      "description": "Whether submitted events create Journal Entries as drafts, submitted, or never."
+    },
+    {
+      "fieldname": "price_provider",
+      "label": "Price Provider",
+      "fieldtype": "Select",
+      "options": "Manual\nStooq\nBroker\nAlpha Vantage\nCoinGecko (Pro)",
+      "default": "Manual"
+    },
+    {
+      "fieldname": "price_sync_enabled",
+      "label": "Price Sync Enabled",
+      "fieldtype": "Check",
+      "default": "1"
+    },
+    {
+      "fieldname": "broker_sync_enabled",
+      "label": "Broker Sync Enabled",
+      "fieldtype": "Check",
+      "default": "1"
+    },
+    {
+      "fieldname": "sync_interval_minutes",
+      "label": "Sync Interval Minutes",
+      "fieldtype": "Int",
+      "default": "60"
+    }
+  ],
+  "field_order": [
+    "company",
+    "default_cost_method",
+    "auto_accounting",
+    "price_provider",
+    "price_sync_enabled",
+    "broker_sync_enabled",
+    "sync_interval_minutes"
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1
+    },
+    {
+      "role": "Investment User",
+      "read": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

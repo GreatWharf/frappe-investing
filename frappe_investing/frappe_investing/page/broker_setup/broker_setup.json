@@ -1,0 +1,20 @@
+{
+  "doctype": "Page",
+  "name": "broker_setup",
+  "page_name": "broker_setup",
+  "title": "Broker Setup",
+  "module": "Investing",
+  "standard": "Yes",
+  "system_page": 0,
+  "roles": [
+    {
+      "role": "Investment User"
+    },
+    {
+      "role": "Investment Manager"
+    },
+    {
+      "role": "System Manager"
+    }
+  ]
+}

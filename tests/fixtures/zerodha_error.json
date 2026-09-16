@@ -1,0 +1,5 @@
+{
+  "status": "error",
+  "message": "Invalid session or api key kitekey123 with secret kitesecret456",
+  "error_type": "TokenException"
+}

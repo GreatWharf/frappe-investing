@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexWebServiceResponse>
+  <ResponseCode>0</ResponseCode>
+  <ResponseText>Statement generation request accepted</ResponseText>
+  <ReferenceCode>1234567890</ReferenceCode>
+  <Url>https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement</Url>
+</FlexWebServiceResponse>

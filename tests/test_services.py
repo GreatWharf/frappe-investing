@@ -1,0 +1,340 @@
+"""Offline orchestration tests: fake Frappe store, real engine/services logic."""
+
+import sys
+from datetime import date
+from decimal import Decimal as D
+from types import ModuleType, SimpleNamespace
+
+import pytest
+
+
+class Row(dict):
+    def __getattr__(self, key):
+        if key.startswith("__"):
+            raise AttributeError(key)
+        return self.get(key)
+
+    __setattr__ = dict.__setitem__
+
+    def set(self, key, value):
+        self[key] = value
+
+    def save(self, **kw):
+        store[self.name] = self
+        return self
+
+    def insert(self, **kw):
+        self.name = self.get("name") or f"{self.doctype}-{len(store)}"
+        self.store = store
+        store[self.name] = self
+        return self
+
+    def submit(self):
+        self.docstatus = 1
+        store[self.name] = self
+        from frappe_investing import services
+
+        if self.doctype == "Investment Event":
+            services.apply_event(self)
+        return self
+
+    def check_permission(self, *a):
+        return None
+
+    def get_password(self, field, **kw):
+        return self.get(field)
+
+    def _compute_dedupe(self):
+        import hashlib
+
+        if self.get("source") == "Manual" and not self.get("source_ref"):
+            self.dedupe_key = None
+            return
+        raw = "|".join(str(x or "") for x in (self.account, self.source, self.source_ref))
+        self.dedupe_key = hashlib.sha256(raw.encode()).hexdigest()[:40]
+
+    def to_core_event(self):
+        from frappe_investing.core.events import Event
+        from frappe_investing.core.money import dec
+
+        def d(f):
+            v = self.get(f)
+            return None if v in (None, "") else dec(str(v))
+
+        return Event(
+            type=self.event_type,
+            date=self.posting_date,
+            account=self.account,
+            currency=self.currency,
+            security=self.security,
+            qty=d("qty"),
+            price=d("price"),
+            amount=d("amount"),
+            gross=d("gross"),
+            fees=d("fees") or D(0),
+            taxes=d("taxes") or D(0),
+            accrued_interest=d("accrued_interest") or D(0),
+            split_ratio=d("split_ratio"),
+            basis_allocation=d("basis_allocation"),
+            child_ratio=d("child_ratio"),
+            child_security=self.get("child_security"),
+            source=self.get("source", "Manual"),
+            source_ref=self.get("source_ref", ""),
+        )
+
+
+store = {}
+
+
+@pytest.fixture
+def services(monkeypatch):
+    store.clear()
+    store["Investment Settings"] = Row(
+        doctype="Investment Settings",
+        name="Investment Settings",
+        company="Acme",
+        default_cost_method="FIFO",
+        auto_accounting="Off",
+        price_provider="Manual",
+        broker_sync_enabled=1,
+    )
+    store["Acme"] = Row(doctype="Company", name="Acme", default_currency="USD")
+    store["p1"] = Row(
+        doctype="Portfolio",
+        name="p1",
+        portfolio_name="Main",
+        company="Acme",
+        base_currency="USD",
+        cost_method=None,
+    )
+    store["a1"] = Row(
+        doctype="Investment Account",
+        name="a1",
+        account_name="IB Main",
+        portfolio="p1",
+        currency="USD",
+        enabled=1,
+    )
+    store["sec-aapl"] = Row(
+        doctype="Security",
+        name="sec-aapl",
+        security_name="Apple",
+        asset_class="Stock",
+        currency="USD",
+        ticker="AAPL",
+        status="Active",
+    )
+
+    fake = ModuleType("frappe")
+    fake.session = SimpleNamespace(user="manager@example.test")
+    fake.flags = Row()
+    fake.PermissionError = PermissionError
+    fake.ValidationError = ValueError
+    fake.throw = lambda msg, exc=ValueError, **kw: (_ for _ in ()).throw(exc(msg))
+    fake.only_for = lambda *a: None
+    fake.get_roles = lambda *a: ["Investment Manager", "System Manager"]
+    fake.local = SimpleNamespace(site="test.local")
+    fake.log_error = lambda **kw: None
+    fake.as_json = lambda v: __import__("json").dumps(v)
+    fake._dict = Row
+
+    def get_doc(kind, name=None, **kw):
+        if isinstance(kind, dict):
+            doc = Row(kind)
+            doc.store = store
+            return doc
+        return store[name]
+
+    def get_value(dt, filters, fieldname=None, **kw):
+        rows = _match(dt, filters)
+        if not rows:
+            return None
+        if isinstance(fieldname, str):
+            return rows[0].get(fieldname)
+        return rows[0]
+
+    def get_all(dt, filters=None, fields=None, pluck=None, order_by=None, limit_page_length=None, **kw):
+        rows = _match(dt, filters)
+        if pluck:
+            return [r.get(pluck) for r in rows]
+        return rows
+
+    def _match(dt, filters):
+        if isinstance(filters, str):
+            return [store[filters]] if filters in store and store[filters].get("doctype") == dt else []
+        result = [r for r in store.values() if r.get("doctype") == dt]
+        for key, cond in (filters or {}).items():
+            if isinstance(cond, (list, tuple)) and len(cond) == 2:
+                op, val = cond
+                result = [r for r in result if _op(r.get(key), op, val)]
+            else:
+                result = [r for r in result if r.get(key) == cond]
+        return result
+
+    def _op(value, op, target):
+        if op == "in":
+            return value in target
+        if op == ">":
+            return value is not None and value > target
+        if op == "<=":
+            return value is not None and value <= target
+        if op == "between":
+            return value is not None and target[0] <= value <= target[1]
+        return value == target
+
+    fake.get_doc, fake.get_all = get_doc, get_all
+    fake.get_value = get_value
+    fake.get_single = lambda name: store[name]
+    fake.get_cached_value = lambda dt, name, f: store[name].get(f)
+
+    def set_value(dt, name, key, value=None, **kw):
+        values = key if isinstance(key, dict) else {key: value}
+        store[name].update(values)
+
+    fake.db = SimpleNamespace(
+        get_value=get_value,
+        get_all=get_all,
+        exists=lambda dt, f=None: bool(_match(dt, f)) if f else False,
+        set_value=set_value,
+        count=lambda dt, f=None: len(_match(dt, f)),
+        escape=repr,
+    )
+    fake.delete_doc = lambda dt, name, **kw: store.pop(name, None)
+
+    class Cache:
+        def lock(self, name, **kw):
+            class Lock:
+                def acquire(self, blocking=False):
+                    return True
+
+                def release(self):
+                    return None
+
+            return Lock()
+
+    fake.cache = Cache()
+    utils = ModuleType("frappe.utils")
+    utils.today = lambda: "2026-09-16"
+    utils.now_datetime = lambda: "2026-09-16 12:00:00"
+    utils.add_days = lambda d, n: d
+    utils.cint = int
+    monkeypatch.setitem(sys.modules, "frappe", fake)
+    monkeypatch.setitem(sys.modules, "frappe.utils", utils)
+    for name in ("frappe_investing.services", "frappe_investing.license_service"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    import frappe_investing.services as services_mod
+
+    yield services_mod, fake, store
+    sys.modules.pop("frappe_investing.services", None)
+
+
+def _event(store, **kw):
+    doc = Row({"doctype": "Investment Event", **kw})
+    doc.store = store
+    doc.insert()
+    doc._compute_dedupe()
+    return doc
+
+
+def test_record_event_is_idempotent_by_source_ref(services):
+    services_mod, fake, store = services
+    data = dict(
+        event_type="Buy",
+        posting_date=date(2026, 1, 5),
+        account="a1",
+        security="sec-aapl",
+        qty="10",
+        price="10",
+        currency="USD",
+        source="Zerodha",
+        source_ref="trade-1",
+    )
+    first, created1 = services_mod.record_event(dict(data))
+    second, created2 = services_mod.record_event(dict(data))
+    assert created1 is True and created2 is False and first == second
+    assert len([r for r in store.values() if r.get("doctype") == "Investment Event"]) == 1
+
+
+def test_apply_event_creates_lot_and_allocation_on_sell(services):
+    services_mod, fake, store = services
+    buy = _event(
+        store,
+        event_type="Buy",
+        posting_date=date(2026, 1, 5),
+        account="a1",
+        security="sec-aapl",
+        qty="100",
+        price="10",
+        currency="USD",
+        source="Manual",
+    )
+    services_mod.apply_event(buy)
+    lots = [r for r in store.values() if r.get("doctype") == "Tax Lot"]
+    assert len(lots) == 1 and D(lots[0].qty_open) == D(100)
+    sell = _event(
+        store,
+        event_type="Sell",
+        posting_date=date(2026, 2, 1),
+        account="a1",
+        security="sec-aapl",
+        qty="40",
+        price="15",
+        currency="USD",
+        source="Manual",
+    )
+    services_mod.apply_event(sell)
+    allocs = [r for r in store.values() if r.get("doctype") == "Lot Allocation"]
+    assert len(allocs) == 1
+    assert D(allocs[0].realized_pnl) == D(200)
+    assert D(lots[0].qty_open) == D(60)
+
+
+def test_value_portfolio_aggregates_with_prices(services):
+    services_mod, fake, store = services
+    services_mod.apply_event(
+        _event(
+            store,
+            event_type="Buy",
+            posting_date=date(2026, 1, 5),
+            account="a1",
+            security="sec-aapl",
+            qty="100",
+            price="10",
+            currency="USD",
+            source="Manual",
+        )
+    )
+    store["sp1"] = Row(
+        doctype="Security Price",
+        name="sp1",
+        security="sec-aapl",
+        date=date(2026, 2, 1),
+        close="12.50",
+        currency="USD",
+        source="Manual",
+    )
+    result = services_mod.value_portfolio("p1", day=date(2026, 2, 1))
+    assert result["total_value"] == D("1250.00")
+    assert result["unrealized_pnl"] == D("250.00")
+    assert result["stale"] == []
+
+
+def test_snapshot_is_idempotent_per_day(services):
+    services_mod, fake, store = services
+    services_mod.apply_event(
+        _event(
+            store,
+            event_type="Buy",
+            posting_date=date(2026, 1, 5),
+            account="a1",
+            security="sec-aapl",
+            qty="10",
+            price="10",
+            currency="USD",
+            source="Manual",
+        )
+    )
+    first = services_mod.snapshot_portfolio("p1", day=date(2026, 2, 1))
+    second = services_mod.snapshot_portfolio("p1", day=date(2026, 2, 1))
+    assert first == second
+    assert len([r for r in store.values() if r.get("doctype") == "Portfolio Snapshot"]) == 1

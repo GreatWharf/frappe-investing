@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="FINV History" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1234567" fromDate="2026-01-01" toDate="2026-09-16" periodStart="2026-01-01" whenGenerated="2026-09-16;101520">
+      <Trades>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" exchange="NASDAQ" currency="USD" buySell="BUY" quantity="10" tradePrice="190.25" tradeDate="20260910" dateTime="20260910;093015" commission="-1.00" taxes="0" netCash="-1903.50" tradeID="987654321" ibOrderID="111000111" description="Buy 10 AAPL" />
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSF" isin="" exchange="NASDAQ" currency="USD" buySell="SELL" quantity="-5" tradePrice="420.10" tradeDate="20260911" dateTime="20260911;093015" commission="-0.75" taxes="0" netCash="2099.75" tradeID="987654322" ibOrderID="111000112" description="Sell 5 MSF" />
+      </Trades>
+      <CashTransactions>
+        <CashTransaction accountId="U1234567" currency="USD" type="Dividends" symbol="AAPL" isin="US0378331005" dateTime="20260912;093000" amount="24.50" transactionID="555000001" description="AAPL (US0378331005) Cash Dividend" />
+        <CashTransaction accountId="U1234567" currency="USD" type="Withholding Tax" symbol="AAPL" isin="US0378331005" dateTime="20260912;093000" amount="-3.68" transactionID="555000002" description="AAPL US Tax" />
+        <CashTransaction accountId="U1234567" currency="CHF" type="Withholding Tax" symbol="NESN" isin="CH0038863350" dateTime="20260815;093000" amount="-8.00" transactionID="555000003" description="NESN CH Tax" />
+        <CashTransaction accountId="U1234567" currency="USD" type="Deposits/Withdrawals" symbol="" isin="" dateTime="20260901;120000" amount="5000.00" transactionID="555000004" description="Electronic Fund Transfer" />
+        <CashTransaction accountId="U1234567" currency="USD" type="Other Fees" symbol="" isin="" dateTime="20260905;120000" amount="-2.50" transactionID="555000005" description="Market data subscription" />
+        <CashTransaction accountId="U1234567" currency="USD" type="Mystery Cash" symbol="" isin="" dateTime="20260906;120000" amount="7.77" transactionID="555000006" description="Unknown row type" />
+      </CashTransactions>
+      <CorporateActions>
+        <CorporateAction accountId="U1234567" currency="USD" type="SPLIT" symbol="TSLA" isin="US88160R1014" dateTime="20260825;000000" description="TSLA 3 FOR 1 Stock Split" ratio="3" transactionID="777000001" />
+        <CorporateAction accountId="U1234567" currency="USD" type="SPINOFF" symbol="ABC" isin="" dateTime="20260820;000000" description="ABC spin-off distribution" transactionID="777000002" />
+      </CorporateActions>
+      <SomeFutureSection>
+        <Row foo="bar" />
+      </SomeFutureSection>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

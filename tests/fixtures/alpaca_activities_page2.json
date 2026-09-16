@@ -1,0 +1,32 @@
+{
+  "activities": [
+    {
+      "id": "act-007",
+      "activity_type": "FILL",
+      "transaction_time": "2026-09-15T18:31:00Z",
+      "type": "fill",
+      "price": "191.70",
+      "qty": "4",
+      "side": "sell",
+      "symbol": "AAPL",
+      "order_id": "ord-002",
+      "cum_qty": "4",
+      "leaves_qty": "0"
+    },
+    {
+      "id": "act-008",
+      "activity_type": "INT",
+      "date": "2026-08-31",
+      "net_amount": "1.23",
+      "description": "Interest on cash balance"
+    },
+    {
+      "id": "act-009",
+      "activity_type": "CSW",
+      "date": "2026-09-03",
+      "net_amount": "-1000.00",
+      "description": "Cash withdrawal"
+    }
+  ],
+  "next_page_token": null
+}

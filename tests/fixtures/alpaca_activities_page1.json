@@ -1,0 +1,59 @@
+{
+  "activities": [
+    {
+      "id": "act-001",
+      "activity_type": "FILL",
+      "transaction_time": "2026-09-15T13:30:00Z",
+      "type": "fill",
+      "price": "190.25",
+      "qty": "10",
+      "side": "buy",
+      "symbol": "AAPL",
+      "order_id": "ord-001",
+      "cum_qty": "10",
+      "leaves_qty": "0"
+    },
+    {
+      "id": "act-002",
+      "activity_type": "DIV",
+      "date": "2026-08-20",
+      "net_amount": "22.50",
+      "symbol": "MSFT",
+      "qty": "30",
+      "per_share_amount": "0.75",
+      "description": "Cash Dividend"
+    },
+    {
+      "id": "act-003",
+      "activity_type": "SPLIT",
+      "date": "2026-08-25",
+      "net_amount": "0",
+      "symbol": "TSLA",
+      "qty": "20",
+      "description": "3 for 1 split, additional shares credited"
+    },
+    {
+      "id": "act-004",
+      "activity_type": "DIVWHT",
+      "date": "2026-08-20",
+      "net_amount": "-2.00",
+      "symbol": "MSFT",
+      "description": "Dividend withholding tax"
+    },
+    {
+      "id": "act-005",
+      "activity_type": "CSD",
+      "date": "2026-09-01",
+      "net_amount": "5000.00",
+      "description": "Cash disbursement"
+    },
+    {
+      "id": "act-006",
+      "activity_type": "FOOACT",
+      "date": "2026-09-02",
+      "net_amount": "1.00",
+      "description": "mystery activity"
+    }
+  ],
+  "next_page_token": "pg2"
+}

@@ -1,0 +1,167 @@
+{
+  "doctype": "DocType",
+  "name": "Security",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "security_name",
+      "label": "Security Name",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "asset_class",
+      "label": "Asset Class",
+      "fieldtype": "Select",
+      "options": "Stock\nETF\nBond\nFund\nCrypto",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "currency",
+      "label": "Currency",
+      "fieldtype": "Link",
+      "options": "Currency",
+      "reqd": 1
+    },
+    {
+      "fieldname": "ticker",
+      "label": "Ticker",
+      "fieldtype": "Data",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "exchange",
+      "label": "Exchange",
+      "fieldtype": "Link",
+      "options": "Exchange"
+    },
+    {
+      "fieldname": "isin",
+      "label": "Isin",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "figi",
+      "label": "Figi",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "provider_symbols",
+      "label": "Provider Symbols",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "stooq_symbol",
+      "label": "Stooq Symbol",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "alphavantage_symbol",
+      "label": "Alphavantage Symbol",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "coingecko_id",
+      "label": "Coingecko Id",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "bond_details",
+      "label": "Bond Details",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "face_value",
+      "label": "Face Value",
+      "fieldtype": "Currency"
+    },
+    {
+      "fieldname": "coupon_rate",
+      "label": "Coupon Rate",
+      "fieldtype": "Percent"
+    },
+    {
+      "fieldname": "coupon_frequency",
+      "label": "Coupon Frequency",
+      "fieldtype": "Select",
+      "options": "1\n2\n4\n12"
+    },
+    {
+      "fieldname": "issue_date",
+      "label": "Issue Date",
+      "fieldtype": "Date"
+    },
+    {
+      "fieldname": "maturity_date",
+      "label": "Maturity Date",
+      "fieldtype": "Date"
+    },
+    {
+      "fieldname": "day_count",
+      "label": "Day Count",
+      "fieldtype": "Select",
+      "options": "30/360\nACT/ACT\nACT/360"
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "options": "Active\nDelisted",
+      "default": "Active"
+    }
+  ],
+  "field_order": [
+    "security_name",
+    "asset_class",
+    "currency",
+    "ticker",
+    "exchange",
+    "isin",
+    "figi",
+    "provider_symbols",
+    "stooq_symbol",
+    "alphavantage_symbol",
+    "coingecko_id",
+    "bond_details",
+    "face_value",
+    "coupon_rate",
+    "coupon_frequency",
+    "issue_date",
+    "maturity_date",
+    "day_count",
+    "status"
+  ],
+  "permissions": [
+    {
+      "role": "Investment User",
+      "read": 1,
+      "create": 1,
+      "write": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "create": 1,
+      "write": 1,
+      "delete": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "title_field": "security_name"
+}

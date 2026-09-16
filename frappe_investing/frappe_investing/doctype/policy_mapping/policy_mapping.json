@@ -1,0 +1,64 @@
+{
+  "doctype": "DocType",
+  "name": "Policy Mapping",
+  "module": "Investing",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "issingle": 0,
+  "istable": 1,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "event_type",
+      "label": "Event Type",
+      "fieldtype": "Select",
+      "options": "Buy\nSell\nDividend\nCoupon\nInterest\nFee\nDeposit\nWithdrawal\nTransfer In\nTransfer Out\nSplit\nReverse Split\nStock Dividend\nSpin-off\nCash-in-lieu\nRedemption\nFX Conversion",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "debit_account",
+      "label": "Debit Account",
+      "fieldtype": "Link",
+      "options": "Account",
+      "reqd": 1
+    },
+    {
+      "fieldname": "credit_account",
+      "label": "Credit Account",
+      "fieldtype": "Link",
+      "options": "Account",
+      "reqd": 1
+    },
+    {
+      "fieldname": "tax_debit_account",
+      "label": "Tax Debit Account",
+      "fieldtype": "Link",
+      "options": "Account"
+    },
+    {
+      "fieldname": "fee_debit_account",
+      "label": "Fee Debit Account",
+      "fieldtype": "Link",
+      "options": "Account"
+    },
+    {
+      "fieldname": "pnl_account",
+      "label": "Pnl Account",
+      "fieldtype": "Link",
+      "options": "Account"
+    }
+  ],
+  "field_order": [
+    "event_type",
+    "debit_account",
+    "credit_account",
+    "tax_debit_account",
+    "fee_debit_account",
+    "pnl_account"
+  ],
+  "permissions": [],
+  "track_changes": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}
