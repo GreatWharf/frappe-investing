@@ -36,7 +36,7 @@
       "fieldname": "price_provider",
       "label": "Price Provider",
       "fieldtype": "Select",
-      "options": "Manual\nStooq\nBroker\nAlpha Vantage\nCoinGecko (Pro)",
+      "options": "Manual\nStooq\nBroker\nAlpha Vantage\nCoinGecko",
       "default": "Manual"
     },
     {

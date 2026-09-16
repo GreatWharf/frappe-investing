@@ -147,7 +147,8 @@ class TestInvestingIntegration(IntegrationTestCase):
         result = value_portfolio(self.portfolio.name, day="2026-02-01")
         self.assertEqual(float(result["total_value"]), 125.0)
 
-    def test_crypto_requires_pro_license(self):
+    def test_free_tier_blocks_a_second_asset_class(self):
+        # The fixture already created a Stock security; the free tier covers 1 class.
         with self.assertRaises(frappe.PermissionError):
             frappe.get_doc(
                 {
@@ -158,3 +159,15 @@ class TestInvestingIntegration(IntegrationTestCase):
                     "status": "Active",
                 }
             ).insert()
+
+    def test_free_tier_allows_more_of_the_same_class(self):
+        # Adding another Stock does not grow the class count beyond the limit.
+        frappe.get_doc(
+            {
+                "doctype": "Security",
+                "security_name": "Another Stock",
+                "asset_class": "Stock",
+                "currency": "USD",
+                "status": "Active",
+            }
+        ).insert()

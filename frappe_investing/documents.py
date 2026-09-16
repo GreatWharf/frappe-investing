@@ -48,10 +48,10 @@ class ManagedDocument(Document):
 
     # -- Security ---------------------------------------------------------
     def _validate_security(self):
-        if self.asset_class == "Crypto":
-            from .license_service import require_feature
+        if self.is_new() and self.asset_class:
+            from .license_service import require_asset_class
 
-            require_feature("crypto")
+            require_asset_class(self.asset_class)
         if self.asset_class == "Bond":
             for f in ("face_value", "coupon_rate", "coupon_frequency", "issue_date", "maturity_date"):
                 if not self.get(f):
@@ -68,10 +68,6 @@ class ManagedDocument(Document):
         event.validate()
         if self.security:
             asset_class = frappe.db.get_value("Security", self.security, "asset_class")
-            if asset_class == "Crypto":
-                from .license_service import require_feature
-
-                require_feature("crypto")
             if asset_class == "Bond" and self.event_type in {"Buy", "Sell"}:
                 # Bond accounting must show accrued interest explicitly.
                 if self.get("accrued_interest") in (None, ""):

@@ -4,7 +4,7 @@
 
 Track stocks, ETFs and bonds with an auditable, event-sourced ledger inside ERPNext. Connect brokers automatically, or import CSV. Every position is derived from immutable investment events, every profit and loss can be traced back to its tax lots, and every accounting entry follows your own accounting policy.
 
-**Standard tier is free and open source (MIT).** Pro adds crypto holdings — enforced in-app, not just on the price page.
+**The free tier is open source (MIT) and tracks one asset class forever.** Paid tiers raise the asset-class count and can carry a portfolio-value cap — enforced in-app, not just on the price page.
 
 > Status: implementation release candidate. Not yet on the Frappe Marketplace; not yet live-validated against a production broker account. See `docs/verification.md`.
 
@@ -21,19 +21,20 @@ Track stocks, ETFs and bonds with an auditable, event-sourced ledger inside ERPN
 
 ## Tiers
 
-| | Standard (free) | Pro |
+| | Free | Pro |
 |---|---|---|
-| Stocks, ETFs, bonds, funds | ✓ | ✓ |
+| Stocks, ETFs, bonds, funds, crypto features | ✓ | ✓ |
 | All broker connectors + CSV | ✓ | ✓ |
 | Corporate actions, lots, performance, accounting | ✓ | ✓ |
-| **Crypto asset class + crypto prices** | — | ✓ |
+| **Asset classes tracked at once** | **1** | **5** |
+| **Portfolio value cap** | none | per license |
 
-Pro is activated by an offline-signed license key (Investment License). No feature data leaves your site; verification is local. Open source means this is a commercial control, not DRM — see `docs/tiers.md` for the honest version.
+Every tier has every feature; tiers differ only in how many asset classes you track and (optionally) a value cap. Paid tiers activate with an offline-signed license key (Investment License). No feature data leaves your site; verification is local. Open source means this is a commercial control, not DRM — see `docs/tiers.md` for the honest version.
 
 ## Data sources (zero mandatory cost)
 
 - **Brokers are account truth** — trades, holdings, dividends and withholding come from your broker, with your credentials, on your site.
-- **Prices:** manual entry, Stooq EOD (free, no key), broker quotes, or your own Alpha Vantage key. Crypto prices via CoinGecko (Pro).
+- **Prices:** manual entry, Stooq EOD (free, no key), broker quotes, or your own Alpha Vantage key. Crypto prices via CoinGecko (counts toward your license's asset-class limit).
 - **Zerodha honesty:** the Kite API provides holdings, quotes and today's trades — not historical trades or dividends. Those import from Zerodha Console CSV exports. This is documented, not hidden.
 
 ## Getting started

@@ -182,13 +182,17 @@ def _resolve_security(security_key, company):
         existing = frappe.db.get_value("Security", {"isin": security_key[5:]}, "name")
         if existing:
             return existing
+    from .license_service import require_asset_class
+
+    asset_class = "Crypto" if security_key.startswith("CRYPTO:") else "Stock"
+    require_asset_class(asset_class)  # auto-created securities count toward the tier limit too
     name = (
         frappe.get_doc(
             {
                 "doctype": "Security",
                 "security_name": security_key,
                 "ticker": security_key,
-                "asset_class": "Stock",
+                "asset_class": asset_class,
                 "currency": frappe.get_cached_value("Company", company, "default_currency"),
                 "status": "Active",
             }
@@ -205,10 +209,10 @@ def refresh_prices(provider=None, securities=None):
     provider = provider or conf.price_provider
     if provider == "Manual":
         return {"updated": 0, "note": "Manual pricing selected."}
-    if provider == "CoinGecko (Pro)":
-        from .license_service import require_feature
+    if provider == "CoinGecko":
+        from .license_service import require_asset_class
 
-        require_feature("crypto")
+        require_asset_class("Crypto")  # pricing crypto counts as tracking the class
         adapter = coingecko.CoinGeckoProvider(gate=lambda feature: True)
         symbol_field = "coingecko_id"
     elif provider == "Stooq":

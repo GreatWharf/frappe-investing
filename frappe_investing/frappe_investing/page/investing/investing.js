@@ -183,7 +183,7 @@
 			}
 			renderToolbar(data);
 			renderKpis(data);
-			renderUpsell(data);
+			renderUsage(data);
 			renderAllocation(data);
 			renderHoldings(data);
 			renderConnections(data);
@@ -298,10 +298,34 @@
 				inv.signClass(income));
 		}
 
-		function renderUpsell(data) {
-			if (data.crypto_enabled !== false) return;
-			const row = $('<div class="inv-upsell">').appendTo(root);
-			$("<span>").text(__("Crypto holdings — Pro tier")).appendTo(row);
+		function renderUsage(data) {
+			const license = data.license || {};
+			const usage = data.usage || {};
+			const used = usage.asset_classes_used || [];
+			const max = license.max_asset_classes;
+			const check = usage.value_check;
+			const overClasses = max !== null && max !== undefined && used.length > max;
+			const overValue = !!(check && check.breached);
+			if (!overClasses && !overValue) return;
+			const row = $('<div class="inv-upsell" role="alert">').appendTo(root);
+			let message;
+			if (overClasses) {
+				message = __(
+					"This site tracks {0} asset classes ({1}); your license covers {2}. Existing holdings stay visible — recording securities in new asset classes needs a higher tier.",
+					[String(used.length), used.join(", "), String(max)]
+				);
+			} else if (check.reason === "missing_fx") {
+				message = __(
+					"Add an FX rate from {0} to {1} so the license's value cap can be checked; valuations continue meanwhile.",
+					[check.base_currency || "", check.value_currency || ""]
+				);
+			} else {
+				message = __(
+					"This portfolio's value is above your license's cap of {0} {1}. Tracking continues; contact your vendor to raise the cap.",
+					[check.max_value || "", check.value_currency || ""]
+				);
+			}
+			$("<span>").text(message).appendTo(row);
 			$("<a>")
 				.attr("href", "#inv-license")
 				.text(__("View license"))
@@ -627,27 +651,34 @@
 			$("<h2>").text(__("License")).appendTo(section);
 			const tier = $('<div class="inv-license-tier">').appendTo(section);
 			if (license.status === "none" || !license.status) {
-				tier.text(__("Standard (free)"));
+				tier.text(__("Free tier"));
 				$('<div class="inv-license-meta">')
-					.text(__("Stocks, ETFs, bonds, brokers, imports, performance and accounting are free forever. Crypto is the paid Pro tier."))
+					.text(__("One asset class, free forever. Enter a license key to track more asset classes or lift a portfolio-value cap."))
 					.appendTo(section);
 			} else if (license.status === "active") {
 				tier.text(license.tier === "pro" ? __("Pro") : __("Standard"));
+				const limits = license.max_asset_classes === null || license.max_asset_classes === undefined
+					? __("unlimited asset classes")
+					: __("{0} asset class(es)", [String(license.max_asset_classes)]);
+				const cap = license.max_value
+					? ` ${__("Value capped at {0} {1}.", [String(license.max_value), license.value_currency || ""])}`
+					: "";
 				$('<div class="inv-license-meta">')
 					.text(
 						__("Licensed to {0}.", [license.customer || __("Unknown customer")]) +
+							` ${__("Covers {0}.", [limits])}` + cap +
 							(license.expires ? ` ${__("Renews or expires on {0}.", [inv.formatDate(license.expires)])}` : "")
 					)
 					.appendTo(section);
 			} else if (license.status === "expired") {
-				tier.text(__("Standard"));
+				tier.text(__("Free tier"));
 				$('<div class="inv-warn" role="alert">')
-					.text(__("License expired on {0}. Pro features are disabled; renew to restore them.", [inv.formatDate(license.expires)]))
+					.text(__("License expired on {0}. The free tier's limits apply again; renew to restore your tier.", [inv.formatDate(license.expires)]))
 					.appendTo(section);
 			} else {
-				tier.text(__("Standard"));
+				tier.text(__("Free tier"));
 				$('<div class="inv-warn" role="alert">')
-					.text(__("The stored license key is invalid. Enter a valid key to enable Pro features."))
+					.text(__("The stored license key is invalid. Enter a valid key to enable your tier."))
 					.appendTo(section);
 			}
 			if (inv.isManager()) {

@@ -41,7 +41,7 @@ function dashboardFixture() {
 			unrealized_pnl: "3000.25",
 			allocation_by_class: { Stock: "100.00" },
 		},
-		performance: { twr_ytd: "0.0523", xirr_ytd: null, snapshots: 30 },
+		performance: { twr_ytd: "0.0523", xirr_ytd: null, realized_pnl_ytd: "1250.50", income_ytd: "420.00", snapshots: 30 },
 		connections: [
 			{ name: "CONN-Z", connection_name: "Zerodha Main", broker: "Zerodha", status: "Connected", enabled: 1, last_sync: "2026-09-16 09:30:00", last_error: "" },
 			{ name: "CONN-A", connection_name: "Alpaca US", broker: "Alpaca", status: "Error", enabled: 0, last_sync: null, last_error: "unauthorized" },
@@ -53,8 +53,8 @@ function dashboardFixture() {
 			{ name: "EV-0008", event_type: "Buy", posting_date: "2026-09-14", security: "SEC-RELIANCE", qty: "10", price: "2000", currency: "INR", accounting_status: "Posted" },
 			{ name: "EV-0007", event_type: "Deposit", posting_date: "2026-09-13", security: null, qty: null, price: null, currency: "INR", accounting_status: "Pending" },
 		],
-		license: { tier: "standard", status: "none", customer: "", expires: "" },
-		crypto_enabled: false,
+		license: { tier: "standard", status: "none", customer: "", expires: "", max_asset_classes: 1, max_value: null, value_currency: null },
+		usage: { asset_classes_used: ["Stock", "Bond"], value_check: null },
 		settings: { price_provider: "Stooq", auto_accounting: 1, default_cost_method: "FIFO" },
 	};
 }
@@ -135,15 +135,18 @@ test("dashboard renders KPI cards from the get_dashboard payload", async () => {
 	const unrealized = kpiCard(desk, "Unrealized P&L").valueEl;
 	assert.equal(unrealized.textValue, "INR 3,000.25");
 	assert.ok(unrealized.classes.has("inv-pos"));
-	// The frozen API does not expose these; the cards must degrade to a dash.
-	assert.equal(kpiCard(desk, "Realized P&L (YTD)").valueEl.textValue, "—");
-	assert.equal(kpiCard(desk, "Income (YTD)").valueEl.textValue, "—");
+	// YTD totals come from performance_summary; they render as money, not dashes.
+	assert.equal(kpiCard(desk, "Realized P&L (YTD)").valueEl.textValue, "INR 1,250.50");
+	assert.equal(kpiCard(desk, "Income (YTD)").valueEl.textValue, "INR 420.00");
 
-	// Allocation bar and upsell row.
+	// Allocation bar and the over-tier usage banner (2 classes used, license covers 1).
 	const fill = desk.find(".inv-alloc-fill").get(0);
 	assert.ok(fill, "allocation bar rendered");
 	assert.equal(fill.style.width, "100%");
-	assert.ok(desk.texts().includes("Crypto holdings — Pro tier"));
+	assert.ok(
+		desk.texts().some((t) => /tracks 2 asset classes \(Stock, Bond\); your license covers 1/.test(t)),
+		"over-tier usage banner rendered"
+	);
 
 	// Holdings: stale bond sinks below the priced row under value-desc default.
 	const bodyRows = desk.find("tbody").toArray()[0].children;
@@ -333,7 +336,7 @@ test("empty state renders the setup CTA and creates a portfolio", async () => {
 	await loadDashboardPage(desk);
 	assert.ok(desk.button("Create Portfolio"), "setup CTA visible to a manager");
 	assert.ok(desk.button("Open Broker Setup"), "link to the guided connector page");
-	assert.ok(desk.texts().some((t) => /Standard \(free\)/.test(t)), "license card still renders");
+	assert.ok(desk.texts().some((t) => /Free tier/.test(t)), "license card still renders");
 
 	desk.button("Create Portfolio").click();
 	const dialog = desk.lastDialog();

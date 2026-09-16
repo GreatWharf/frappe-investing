@@ -39,8 +39,8 @@ def get_dashboard(portfolio=None):
     if not portfolio:
         return {
             "needs_setup": True,
-            "license": _license_public(),
-            "crypto_enabled": license_service.has_feature("crypto"),
+            "license": license_service.public_state(),
+            "usage": {"asset_classes_used": [], "value_check": None},
             "portfolios": portfolios,
             "settings": {
                 "price_provider": settings.price_provider,
@@ -88,8 +88,11 @@ def get_dashboard(portfolio=None):
         "connections": connections,
         "pending_accounting": pending,
         "recent_events": recent,
-        "license": _license_public(),
-        "crypto_enabled": license_service.has_feature("crypto"),
+        "license": license_service.public_state(),
+        "usage": {
+            "asset_classes_used": license_service.used_asset_classes(),
+            "value_check": license_service.portfolio_value_check(values["total_value"], values["base"]),
+        },
         "settings": {
             "price_provider": settings.price_provider,
             "auto_accounting": settings.auto_accounting,
@@ -190,12 +193,7 @@ def save_license(license_key):
 @frappe.whitelist()
 def license_status():
     _user()
-    return _license_public()
-
-
-def _license_public():
-    state = license_service.current_state()
-    return {"tier": state.tier, "status": state.status, "customer": state.customer, "expires": state.expires}
+    return license_service.public_state()
 
 
 # ---------------------------------------------------------------- broker setup

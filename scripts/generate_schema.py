@@ -75,7 +75,7 @@ def main():
                 ),
                 select(
                     "price_provider",
-                    ["Manual", "Stooq", "Broker", "Alpha Vantage", "CoinGecko (Pro)"],
+                    ["Manual", "Stooq", "Broker", "Alpha Vantage", "CoinGecko"],
                     default="Manual",
                 ),
                 field("price_sync_enabled", "Check", default="1"),
@@ -91,6 +91,7 @@ def main():
                 field("status", read_only=1),
                 field("customer", read_only=1),
                 field("expires", "Date", read_only=1),
+                field("limits", "Small Text", read_only=1),
                 field("validated_at", "Datetime", read_only=1),
                 field("status_note", "Small Text", read_only=1),
             ],

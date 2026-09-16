@@ -99,6 +99,18 @@ def services(monkeypatch):
         broker_sync_enabled=1,
     )
     store["Acme"] = Row(doctype="Company", name="Acme", default_currency="USD")
+    store["Investment License"] = Row(
+        doctype="Investment License",
+        name="Investment License",
+        license_key="",
+        tier="standard",
+        status="none",
+        customer="",
+        expires=None,
+        validated_at=None,
+        status_note="",
+        limits="",
+    )
     store["p1"] = Row(
         doctype="Portfolio",
         name="p1",
@@ -156,7 +168,10 @@ def services(monkeypatch):
     def get_all(dt, filters=None, fields=None, pluck=None, order_by=None, limit_page_length=None, **kw):
         rows = _match(dt, filters)
         if pluck:
-            return [r.get(pluck) for r in rows]
+            values = [r.get(pluck) for r in rows]
+            if kw.get("distinct"):
+                values = list(dict.fromkeys(v for v in values if v is not None))
+            return values
         return rows
 
     def _match(dt, filters):
@@ -226,6 +241,7 @@ def services(monkeypatch):
 
     yield services_mod, fake, store
     sys.modules.pop("frappe_investing.services", None)
+    sys.modules.pop("frappe_investing.license_service", None)
 
 
 def _event(store, **kw):
@@ -415,3 +431,88 @@ def test_sync_event_payload_carries_connection(services, monkeypatch):
     assert doc["connection"] == "conn-1"
     assert doc["source"] == "Zerodha"
     assert doc["account"] == "a1"
+
+
+def _license_state(**kw):
+    from frappe_investing import licensing
+
+    defaults = dict(
+        status="active", tier="pro", customer="Acme", expires="2027-09-16",
+        max_asset_classes=5, max_value=None, value_currency=None,
+    )
+    return licensing.LicenseState(**{**defaults, **kw})
+
+
+def _license_mod(services, state):
+    services_mod, fake, store = services
+    import frappe_investing.license_service as license_mod
+
+    store["Investment License"].license_key = "FINV1.fake.fake"
+    license_mod.evaluate = lambda key, **kw: state
+    return license_mod
+
+
+def test_require_asset_class_free_tier_blocks_a_second_class(services):
+    license_mod = _license_mod(
+        services, _license_state(status="none", tier="standard", max_asset_classes=1)
+    )
+    license_mod.require_asset_class("Stock")  # already in use: allowed
+    with pytest.raises(PermissionError, match="1 asset class"):
+        license_mod.require_asset_class("Bond")
+
+
+def test_require_asset_class_unlimited_never_blocks(services):
+    license_mod = _license_mod(services, _license_state(max_asset_classes=None))
+    license_mod.require_asset_class("Crypto")  # no exception
+
+
+def test_public_state_exposes_limits(services):
+    license_mod = _license_mod(
+        services, _license_state(max_asset_classes=3, max_value="250000", value_currency="USD")
+    )
+    public = license_mod.public_state()
+    assert public["max_asset_classes"] == 3
+    assert public["max_value"] == "250000"
+    assert public["value_currency"] == "USD"
+    assert public["status"] == "active"
+
+
+def test_portfolio_value_check_same_currency_breach(services):
+    license_mod = _license_mod(
+        services, _license_state(max_value="100000", value_currency="USD")
+    )
+    assert license_mod.portfolio_value_check(D("90000"), "USD") is None
+    breach = license_mod.portfolio_value_check(D("120000"), "USD")
+    assert breach["breached"] and breach["reason"] == "over_cap"
+    assert breach["rate_used"] == "1"
+
+
+def test_portfolio_value_check_converts_through_fx(services):
+    license_mod = _license_mod(
+        services, _license_state(max_value="100000", value_currency="USD")
+    )
+    services[2]["fx1"] = Row(
+        doctype="FX Rate",
+        name="fx1",
+        from_currency="INR",
+        to_currency="USD",
+        date=date(2026, 9, 1),
+        rate="0.012",
+    )
+    # ₹9,000,000 × 0.012 = $108,000 > $100,000 cap
+    breach = license_mod.portfolio_value_check(D("9000000"), "INR")
+    assert breach["reason"] == "over_cap"
+    assert D(breach["converted_value"]) == D("108000.000000")
+
+
+def test_portfolio_value_check_missing_rate_fails_closed(services):
+    license_mod = _license_mod(
+        services, _license_state(max_value="100000", value_currency="USD")
+    )
+    breach = license_mod.portfolio_value_check(D("10"), "EUR")
+    assert breach["breached"] and breach["reason"] == "missing_fx"
+
+
+def test_portfolio_value_check_no_cap_is_quiet(services):
+    license_mod = _license_mod(services, _license_state())
+    assert license_mod.portfolio_value_check(D("999999999"), "JPY") is None

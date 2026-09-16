@@ -1,9 +1,9 @@
-"""CoinGecko market data for crypto (Pro tier).
+"""CoinGecko market data for crypto.
 
-Crypto is the paid tier, so this adapter requires an injected ``gate``
-callable: ``gate("crypto")`` must return True or every call raises
-``MarketDataError("Crypto requires the Pro tier")``. The public API needs
-no key.
+Crypto counts toward the license's asset-class limit, so this adapter
+requires an injected ``gate`` callable: ``gate("crypto")`` must return True
+or every call raises ``MarketDataError("Crypto requires a tier with more
+asset classes")``. The public API needs no key.
 
 * ``/simple/price`` returns the CURRENT price only. ``daily_prices`` serves
   today's quote and raises ``code="unsupported"`` for any past day — we
@@ -21,7 +21,7 @@ from datetime import date
 from ..connectors.base import http_json
 from .base import MarketDataError, ProviderBase, day_str
 
-PRO_TIER_MESSAGE = "Crypto requires the Pro tier"
+PRO_TIER_MESSAGE = "Crypto requires a tier with more asset classes"
 
 BUILTIN_IDS = {
     "BTC": "bitcoin",

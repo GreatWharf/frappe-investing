@@ -38,6 +38,12 @@
       "read_only": 1
     },
     {
+      "fieldname": "limits",
+      "label": "Limits",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
       "fieldname": "validated_at",
       "label": "Validated At",
       "fieldtype": "Datetime",
@@ -56,6 +62,7 @@
     "status",
     "customer",
     "expires",
+    "limits",
     "validated_at",
     "status_note"
   ],

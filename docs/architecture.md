@@ -46,4 +46,4 @@ Events apply in posting-date order per account/security; the controller rejects 
 
 - Connectors and market-data adapters are pure Python: no `frappe` imports, injectable HTTP sessions, sanitized errors, size/time caps, no redirects on token endpoints.
 - Broker credentials are Frappe Password fields. Zerodha access tokens expire daily (Kite design) — the UI says so.
-- The tier gate is evaluated offline (Ed25519) and checked server-side at Security save (asset_class=Crypto), event validation, and the CoinGecko adapter.
+- The tier gate is evaluated offline (Ed25519). Tiers are tracking limits — a number of asset classes, plus an optional portfolio-value cap in a reference currency — checked server-side when a Security is created (including broker-sync auto-creation). Existing data is never locked; over-limit usage surfaces as a dashboard banner.

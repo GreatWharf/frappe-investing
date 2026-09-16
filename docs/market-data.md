@@ -10,7 +10,7 @@ The app is free to run: no mandatory data subscription.
 | Broker | your broker credentials | Quotes stored during broker sync where the connector supports them. |
 | Stooq | — | Free end-of-day CSV. The Security's `stooq_symbol` (e.g. `aapl.us`) drives lookup; Stooq CSV does not state currency, so the Security's own currency applies. |
 | Alpha Vantage | your free key | Adapter is opt-in with each site's own key. Alpha Vantage's default terms are personal/non-commercial; their open-source allowance requires written confirmation — do not assume it. |
-| CoinGecko | — (Pro tier) | Crypto prices; gated by license. Public API is rate-limited. |
+| CoinGecko | — | Crypto prices. Crypto counts toward the license's asset-class limit. Public API is rate-limited. |
 
 Prices are EOD-only by design. This is an accounting system, not a trading terminal; realtime exchange licensing is deliberately out of scope.
 

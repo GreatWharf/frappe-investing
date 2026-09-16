@@ -17,15 +17,15 @@ def make_provider(gate=PRO_GATE, session=None):
 
 def test_gate_denied_blocks_prices_and_search_with_pro_tier_message():
     provider = make_provider(gate=lambda feature: False)
-    with pytest.raises(MarketDataError, match="Crypto requires the Pro tier"):
+    with pytest.raises(MarketDataError, match="Crypto requires a tier with more asset classes"):
         provider.daily_prices(["CRYPTO:BTC"], date.today())
-    with pytest.raises(MarketDataError, match="Crypto requires the Pro tier"):
+    with pytest.raises(MarketDataError, match="Crypto requires a tier with more asset classes"):
         provider.search("bitcoin")
 
 
 def test_missing_gate_blocks_everything():
     provider = coingecko.CoinGeckoProvider(gate=None, session=FakeSession())
-    with pytest.raises(MarketDataError, match="Crypto requires the Pro tier"):
+    with pytest.raises(MarketDataError, match="Crypto requires a tier with more asset classes"):
         provider.daily_prices(["CRYPTO:BTC"], date.today())
 
 

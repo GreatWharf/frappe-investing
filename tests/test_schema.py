@@ -38,13 +38,13 @@ def test_event_schema_has_dedupe_and_submittable():
     assert fields["dedupe_key"]["hidden"] == 1
 
 
-def test_crypto_is_gated_in_controller_and_schema_allows_it():
+def test_asset_classes_gated_in_controller_and_schema_allows_crypto():
     doc = json.loads((SCHEMA_DIR / "security/security.json").read_text())
     asset = next(f for f in doc["fields"] if f["fieldname"] == "asset_class")
     assert "Crypto" in asset["options"]
     controller = (SCHEMA_DIR / "security/security.py").read_text()
     assert "ManagedDocument" in controller
-    assert "require_feature" in (ROOT / "frappe_investing/documents.py").read_text()
+    assert "require_asset_class" in (ROOT / "frappe_investing/documents.py").read_text()
 
 
 def test_python_310_grammar():
