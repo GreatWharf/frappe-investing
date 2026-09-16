@@ -286,9 +286,8 @@
 				inv.signClass(perf.xirr_ytd));
 			kpiCard(grid, __("Unrealized P&L"), inv.formatMoney(values.unrealized_pnl, base),
 				inv.signClass(values.unrealized_pnl));
-			// The frozen API does not yet expose YTD realized P&L or income in
-			// the dashboard payload; show the values when present, a dash
-			// otherwise (reported as an API gap, api.py untouched).
+			// YTD realized P&L and income come from services.performance_summary
+			// (_period_totals); a dash only appears if an older server omits them.
 			const realized = perf.realized_pnl_ytd;
 			const income = perf.income_ytd;
 			kpiCard(grid, __("Realized P&L (YTD)"),
@@ -330,7 +329,7 @@
 				$('<p class="inv-muted">').text(__("No priced holdings yet.")).appendTo(section);
 				return;
 			}
-			entries.forEach(([label, pct], i) => {
+			entries.forEach(([label, pct]) => {
 				const row = $('<div class="inv-alloc-row">').appendTo(section);
 				$('<span class="inv-alloc-label">').text(label).appendTo(row);
 				const track = $('<div class="inv-alloc-track">').appendTo(row);
@@ -349,6 +348,7 @@
 			return Object.entries(values.by_security || {}).map(([security, bucket]) => {
 				const qty = inv.num(bucket.qty);
 				const mv = inv.num(bucket.market_value);
+				const lastPrice = inv.num(bucket.last_price);
 				return {
 					security,
 					qty,
@@ -357,10 +357,10 @@
 					unrealized_pnl: inv.num(bucket.unrealized_pnl),
 					asset_class: bucket.asset_class,
 					stale: stale.has(security) || mv === null,
-					// The API does not expose a per-security last price; the
-					// implied price (market value / qty, base currency) is the
-					// honest derivable figure.
-					price: mv !== null && qty ? mv / qty : null,
+					// Prefer the actual last price in the security's own currency;
+					// fall back to the implied price (market value / qty, base).
+					price: lastPrice !== null ? lastPrice : mv !== null && qty ? mv / qty : null,
+					price_currency: lastPrice !== null ? bucket.price_currency || values.base : values.base,
 				};
 			});
 		}
@@ -435,7 +435,7 @@
 				if (row.stale) {
 					$('<span class="indicator-pill yellow inv-badge-stale">').text(__("Stale")).appendTo(priceTd);
 				} else {
-					priceTd.text(row.price === null ? "—" : inv.formatMoney(row.price, values.base));
+					priceTd.text(row.price === null ? "—" : inv.formatMoney(row.price, row.price_currency || values.base));
 				}
 				$("<td>").addClass("inv-num").text(row.market_value === null ? "—" : inv.formatMoney(row.market_value, values.base)).appendTo(tr2);
 				$("<td>").addClass("inv-num").text(row.cost === null ? "—" : inv.formatMoney(row.cost, values.base)).appendTo(tr2);

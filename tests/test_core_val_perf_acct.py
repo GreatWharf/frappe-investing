@@ -46,6 +46,9 @@ def test_valuation_computes_value_cost_and_unrealized_per_position():
     assert result["total_cost"] == D("1200.00")
     assert result["unrealized_pnl"] == D("120.00")
     assert result["by_security"]["AAPL"]["market_value"] == D("1100.00")
+    assert result["by_security"]["AAPL"]["last_price"] == D("11")
+    assert result["by_security"]["AAPL"]["price_currency"] == "USD"
+    assert result["by_security"]["VOD.L"]["last_price"] == D("1.10")
 
 
 def test_valuation_translates_currencies_and_fails_on_missing_rate():
@@ -75,6 +78,7 @@ def test_valuation_translates_currencies_and_fails_on_missing_rate():
     )
     assert result["by_security"]["AAPL"]["market_value"] == D("880.00")  # $1100 × 0.8
     assert result["by_security"]["VOD.L"]["market_value"] == D("220.00")  # £220 unchanged
+    assert result["by_security"]["VOD.L"]["price_currency"] == "GBP"  # last price stays native
     assert result["total_value"] == D("1100.00")
     alloc = valuation.allocation(result["by_security"], "asset_class")
     assert alloc == {"Equity": D("100.00")}
@@ -94,6 +98,7 @@ def test_missing_price_is_flagged_not_silently_zero():
     )
     assert result["stale"] == ["VOD.L"]
     assert result["by_security"]["VOD.L"]["market_value"] is None
+    assert result["by_security"]["VOD.L"]["last_price"] is None
 
 
 def test_twr_ignores_external_cash_flows():

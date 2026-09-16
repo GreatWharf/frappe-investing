@@ -37,7 +37,17 @@ def get_dashboard(portfolio=None):
         frappe.throw("Unknown portfolio.", frappe.PermissionError)
     portfolio = portfolio or (portfolios[0].name if portfolios else None)
     if not portfolio:
-        return {"needs_setup": True, "license": _license_public()}
+        return {
+            "needs_setup": True,
+            "license": _license_public(),
+            "crypto_enabled": license_service.has_feature("crypto"),
+            "portfolios": portfolios,
+            "settings": {
+                "price_provider": settings.price_provider,
+                "auto_accounting": settings.auto_accounting,
+                "default_cost_method": settings.default_cost_method,
+            },
+        }
     _check_portfolio(portfolio)
     values = services.value_portfolio(portfolio)
     perf = services.performance_summary(portfolio)

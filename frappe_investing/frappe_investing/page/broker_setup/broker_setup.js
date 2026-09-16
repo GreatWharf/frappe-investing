@@ -111,13 +111,12 @@
 
 		function render() {
 			root.empty();
-			const intro = $('<section class="inv-section"></section>').appendTo(root);
-			$("<h2>").text(__("Connect a broker")).appendTo(intro);
-			$('<p class="inv-section-sub">')
+			// Plain muted intro (no card frame) — the page title already names it.
+			$('<p class="inv-page-note">')
 				.text(
 					__("The broker is account truth: connectors normalize broker data into immutable Investment Events. Prices come from your configured market-data provider or broker quotes.")
 				)
-				.appendTo(intro);
+				.appendTo(root);
 
 			const grid = $('<div class="inv-broker-grid">').appendTo(root);
 			for (const spec of BROKERS) renderCard(grid, spec);
@@ -129,6 +128,7 @@
 			const badges = $('<div class="inv-badges">').appendTo(card);
 			for (const badge of spec.badges) {
 				$('<span class="inv-badge">')
+					.addClass(`indicator-pill ${badge.tone === "yes" ? "green" : "gray"}`)
 					.addClass(badge.tone === "yes" ? "inv-badge-yes" : "inv-badge-warn")
 					.text(badge.label)
 					.appendTo(badges);
@@ -166,11 +166,12 @@
 			const left = $("<span>").appendTo(row);
 			$('<span class="inv-conn-title">').text(conn.connection_name || conn.name).appendTo(left);
 			$('<span class="inv-pill">')
+				.addClass(`indicator-pill ${inv.statusIndicator(conn.status)}`)
 				.addClass(inv.statusPillClass(conn.status))
 				.text(conn.status || __("Not Connected"))
 				.appendTo(left);
 			if (!conn.enabled) {
-				$('<span class="inv-pill inv-pill-gray">').text(__("Disabled")).appendTo(left);
+				$('<span class="indicator-pill gray inv-pill inv-pill-gray">').text(__("Disabled")).appendTo(left);
 			}
 			const right = $("<span>").appendTo(row);
 			$('<a class="btn btn-default btn-sm">')

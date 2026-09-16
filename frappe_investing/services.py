@@ -465,7 +465,14 @@ def performance_summary(portfolio_name, as_of=None):
         xirr = performance.xirr(flows, terminal, date.fromisoformat(str(as_of))) if flows else None
     except ValueError:
         xirr = None
-    return {"twr_ytd": twr, "xirr_ytd": xirr, "snapshots": len(snaps)}
+    realized, income_amt = _period_totals(portfolio_name, as_of)
+    return {
+        "twr_ytd": twr,
+        "xirr_ytd": xirr,
+        "realized_pnl_ytd": realized,
+        "income_ytd": income_amt,
+        "snapshots": len(snaps),
+    }
 
 
 def _flow_sign(row):

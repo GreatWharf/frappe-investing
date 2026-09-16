@@ -57,9 +57,13 @@ frappe.ui.form.on("Broker Connection", {
 		}, viewGroup);
 
 		frm.add_custom_button(__("View Events"), () => {
-			// Investment Event has no direct connection link; its `source`
-			// carries the broker name, so this is the closest native filter.
-			frappe.set_route("List", "Investment Event", { source: frm.doc.broker });
+			// Synced events carry the Broker Connection link; CSV Import has no
+			// connection on its events, so those stay filtered by source.
+			if (frm.doc.broker === "CSV Import") {
+				frappe.set_route("List", "Investment Event", { source: "CSV Import" });
+			} else {
+				frappe.set_route("List", "Investment Event", { connection: frm.doc.name });
+			}
 		}, viewGroup);
 
 		frm.add_custom_button(__("Broker Setup"), () => {

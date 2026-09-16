@@ -76,7 +76,12 @@ function deskWithDashboard({ roles = ["Investment Manager"], dashboard, extra = 
 		roles,
 		defaultCompany: "Co",
 		responder: makeResponder({
-			"frappe_investing.api.get_dashboard": () => ({ message: clone(data) }),
+			// Echo the requested portfolio, as the real API does.
+			"frappe_investing.api.get_dashboard": (args) => {
+				const reply = clone(data);
+				if (args && args.portfolio) reply.portfolio = args.portfolio;
+				return { message: reply };
+			},
 			...extra,
 		}),
 	});
@@ -333,7 +338,7 @@ test("empty state renders the setup CTA and creates a portfolio", async () => {
 	desk.button("Create Portfolio").click();
 	const dialog = desk.lastDialog();
 	assert.deepEqual(
-		dialog.fields.map((f) => f.fieldname),
+		Array.from(dialog.fields, (f) => f.fieldname),
 		["portfolio_name", "company", "base_currency"]
 	);
 	dialog.set_value("portfolio_name", "Family Office");
@@ -503,7 +508,12 @@ test("broker connection buttons, dirty guard and honest headline", () => {
 	expired.buttons.find((b) => b.label === "View Sync Logs").fn();
 	assert.deepEqual(desk.recorded.routes.at(-1), ["List", "Broker Sync Log", { connection: "CONN-Z" }]);
 	expired.buttons.find((b) => b.label === "View Events").fn();
-	assert.deepEqual(desk.recorded.routes.at(-1), ["List", "Investment Event", { source: "Zerodha" }]);
+	assert.deepEqual(desk.recorded.routes.at(-1), ["List", "Investment Event", { connection: "CONN-Z" }]);
+
+	// CSV Import events carry no connection link, so its View Events keeps the source filter.
+	const csv = runConnectionForm(desk, { name: "CONN-C", broker: "CSV Import", enabled: 1, status: "Connected" });
+	csv.buttons.find((b) => b.label === "View Events").fn();
+	assert.deepEqual(desk.recorded.routes.at(-1), ["List", "Investment Event", { source: "CSV Import" }]);
 
 	// Dirty form guard: no API call, a save-first message instead.
 	const dirty = runConnectionForm(desk, { name: "CONN-Z", broker: "Zerodha", enabled: 1, status: "Connected" }, { dirty: true });

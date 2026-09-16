@@ -152,6 +152,13 @@
       "fieldtype": "Data"
     },
     {
+      "fieldname": "connection",
+      "label": "Broker Connection",
+      "fieldtype": "Link",
+      "options": "Broker Connection",
+      "read_only": 1
+    },
+    {
       "fieldname": "dedupe_key",
       "label": "Dedupe Key",
       "fieldtype": "Data",
@@ -218,6 +225,7 @@
     "provenance",
     "source",
     "source_ref",
+    "connection",
     "dedupe_key",
     "reversal_of",
     "journal_entry",

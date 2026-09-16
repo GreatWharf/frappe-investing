@@ -61,6 +61,16 @@ class Element {
 	scrollIntoView() {
 		this.scrolledIntoView = true;
 	}
+
+	trigger(event, arg) {
+		for (const handler of this.handlers[event] || []) {
+			handler.call(this, { preventDefault() {}, type: event }, arg);
+		}
+	}
+
+	click() {
+		this.trigger("click");
+	}
 }
 
 function parseMarkup(markup) {
@@ -352,6 +362,10 @@ function translate(text, args) {
 	return out;
 }
 
+/* Plain data crossing the vm boundary keeps the vm realm's prototypes, which
+ * breaks assert.deepStrictEqual; clone recorded payloads into this realm. */
+const hostClone = (value) => (value === undefined ? value : JSON.parse(JSON.stringify(value)));
+
 function createFrappe(options) {
 	const recorded = {
 		calls: [],
@@ -444,15 +458,15 @@ function createFrappe(options) {
 		},
 
 		set_route(...args) {
-			recorded.routes.push(args);
+			recorded.routes.push(hostClone(args));
 		},
 
 		new_doc(doctype, opts) {
-			recorded.newDocs.push({ doctype, opts });
+			recorded.newDocs.push(hostClone({ doctype, opts }));
 		},
 
 		show_alert(message, seconds) {
-			recorded.alerts.push(typeof message === "string" ? { message } : message);
+			recorded.alerts.push(typeof message === "string" ? { message } : hostClone(message));
 		},
 
 		msgprint(message) {
@@ -465,7 +479,7 @@ function createFrappe(options) {
 		},
 
 		call(callOpts) {
-			recorded.calls.push(callOpts);
+			recorded.calls.push({ ...callOpts, args: hostClone(callOpts.args || {}) });
 			const result = options.responder(callOpts.method, callOpts.args || {}, callOpts);
 			return Promise.resolve(result).then((r) => {
 				if (r && typeof r === "object" && "message" in r) return r;

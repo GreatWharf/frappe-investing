@@ -338,3 +338,80 @@ def test_snapshot_is_idempotent_per_day(services):
     second = services_mod.snapshot_portfolio("p1", day=date(2026, 2, 1))
     assert first == second
     assert len([r for r in store.values() if r.get("doctype") == "Portfolio Snapshot"]) == 1
+
+
+def test_performance_summary_reports_ytd_realized_and_income(services):
+    services_mod, fake, store = services
+    buy = _event(
+        store,
+        event_type="Buy",
+        posting_date=date(2026, 1, 5),
+        account="a1",
+        security="sec-aapl",
+        qty="100",
+        price="10",
+        currency="USD",
+        source="Manual",
+        docstatus=1,
+    )
+    services_mod.apply_event(buy)
+    sell = _event(
+        store,
+        event_type="Sell",
+        posting_date=date(2026, 2, 1),
+        account="a1",
+        security="sec-aapl",
+        qty="40",
+        price="15",
+        currency="USD",
+        source="Manual",
+        docstatus=1,
+    )
+    services_mod.apply_event(sell)
+    _event(
+        store,
+        event_type="Dividend",
+        posting_date=date(2026, 1, 20),
+        account="a1",
+        security="sec-aapl",
+        gross="30",
+        taxes="3",
+        currency="USD",
+        source="Manual",
+        docstatus=1,
+    )
+    summary = services_mod.performance_summary("p1", as_of=date(2026, 2, 1))
+    assert summary["realized_pnl_ytd"] == D(200)  # 40 × (15 − 10)
+    assert summary["income_ytd"] == D(27)  # 30 gross − 3 withholding
+    assert summary["twr_ytd"] == D(0)  # no snapshots yet
+    assert summary["xirr_ytd"] is None  # no external flows
+
+
+def test_sync_event_payload_carries_connection(services, monkeypatch):
+    services_mod, fake, store = services
+    store["conn-1"] = Row(
+        doctype="Broker Connection",
+        name="conn-1",
+        connection_name="Kite Main",
+        broker="Zerodha",
+        company="Acme",
+        enabled=1,
+    )
+    store["a1"].broker_connection = "conn-1"
+    import frappe_investing.sync_service as sync_mod
+
+    doc = sync_mod._event_to_doc(
+        store["conn-1"],
+        {
+            "type": "Buy",
+            "date": date(2026, 1, 5),
+            "security_key": "NSE:RELIANCE",
+            "qty": "5",
+            "price": "2500",
+            "currency": "INR",
+            "source_ref": "zt-1",
+        },
+    )
+    assert doc["connection"] == "conn-1"
+    assert doc["source"] == "Zerodha"
+    assert doc["account"] == "a1"

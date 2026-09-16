@@ -164,6 +164,7 @@ def _event_to_doc(connection, event):
         "currency": event.get("currency") or "INR",
         "source": connection.broker,
         "source_ref": event.get("source_ref"),
+        "connection": connection.name,
         "split_ratio": event.get("split_ratio"),
         "meta_json": frappe.as_json(event.get("meta") or {}),
         "notes": event.get("notes", ""),

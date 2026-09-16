@@ -218,6 +218,7 @@ def main():
                     reqd=1,
                 ),
                 field("source_ref"),
+                link("connection", "Broker Connection", read_only=1),
                 field("dedupe_key", unique=1, hidden=1),
                 link("reversal_of", "Investment Event", read_only=1),
                 link("journal_entry", "Journal Entry", read_only=1),
