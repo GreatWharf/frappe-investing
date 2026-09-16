@@ -167,6 +167,11 @@ def services(monkeypatch):
 
     def get_all(dt, filters=None, fields=None, pluck=None, order_by=None, limit_page_length=None, **kw):
         rows = _match(dt, filters)
+        if order_by:
+            key, _, direction = order_by.partition(" ")
+            rows = sorted(rows, key=lambda r: (r.get(key) is None, r.get(key)), reverse=direction == "desc")
+        if limit_page_length:
+            rows = rows[:limit_page_length]
         if pluck:
             values = [r.get(pluck) for r in rows]
             if kw.get("distinct"):
@@ -191,8 +196,12 @@ def services(monkeypatch):
             return value in target
         if op == ">":
             return value is not None and value > target
+        if op == ">=":
+            return value is not None and value >= target
         if op == "<=":
             return value is not None and value <= target
+        if op == "!=":
+            return value != target
         if op == "between":
             return value is not None and target[0] <= value <= target[1]
         return value == target
@@ -401,6 +410,119 @@ def test_performance_summary_reports_ytd_realized_and_income(services):
     assert summary["income_ytd"] == D(27)  # 30 gross − 3 withholding
     assert summary["twr_ytd"] == D(0)  # no snapshots yet
     assert summary["xirr_ytd"] is None  # no external flows
+
+
+def test_benchmark_return_compares_price_return_in_base_currency(services):
+    services_mod, fake, store = services
+    # Nifty 50 is INR-denominated; portfolio base is USD, so the return is FX-converted.
+    store["sec-bench-nifty"] = Row(
+        doctype="Security",
+        name="sec-bench-nifty",
+        security_name="Nifty 50",
+        ticker="BENCH:NIFTY50",
+        asset_class="Benchmark",
+        currency="INR",
+        status="Active",
+    )
+    store["sp-b1"] = Row(
+        doctype="Security Price",
+        name="sp-b1",
+        security="sec-bench-nifty",
+        date=date(2026, 1, 2),
+        close="22000",
+        currency="INR",
+        source="Stooq",
+    )
+    store["sp-b2"] = Row(
+        doctype="Security Price",
+        name="sp-b2",
+        security="sec-bench-nifty",
+        date=date(2026, 3, 1),
+        close="23100",
+        currency="INR",
+        source="Stooq",
+    )
+    store["fx1"] = Row(
+        doctype="FX Rate",
+        name="fx1",
+        from_currency="INR",
+        to_currency="USD",
+        date=date(2026, 1, 1),
+        rate="0.012",
+    )
+    result = services_mod.benchmark_return("p1", "NIFTY50", as_of=date(2026, 3, 1))
+    assert result["benchmark"] == "NIFTY50"
+    assert result["benchmark_name"] == "Nifty 50 (India)"
+    assert result["benchmark_currency"] == "INR"
+    assert result["base_currency"] == "USD"
+    assert result["note"] is None
+    # 23100/22000 − 1 = 5%, unaffected by the (single) FX rate.
+    assert result["benchmark_return_ytd"] == D("0.05")
+    assert result["benchmark_start"] == "22000"
+    assert result["benchmark_end"] == "23100"
+    assert result["excess_return_ytd"] == D("-0.05")  # portfolio TWR 0 − benchmark 5%
+
+
+def test_benchmark_return_reports_missing_prices_instead_of_fabricating(services):
+    services_mod, fake, store = services
+    result = services_mod.benchmark_return("p1", "SP500", as_of=date(2026, 3, 1))
+    assert result["benchmark_return_ytd"] is None
+    assert result["excess_return_ytd"] is None
+    assert "no price" in result["note"]
+
+
+def test_benchmark_return_fails_closed_without_fx_rate(services):
+    services_mod, fake, store = services
+    store["sp-b1"] = Row(
+        doctype="Security Price",
+        name="sp-b1",
+        security="sec-bench-nifty",
+        date=date(2026, 1, 2),
+        close="22000",
+        currency="INR",
+        source="Stooq",
+    )
+    store["sp-b2"] = Row(
+        doctype="Security Price",
+        name="sp-b2",
+        security="sec-bench-nifty",
+        date=date(2026, 3, 1),
+        close="23100",
+        currency="INR",
+        source="Stooq",
+    )
+    store["sec-bench-nifty"] = Row(
+        doctype="Security",
+        name="sec-bench-nifty",
+        security_name="Nifty 50",
+        ticker="BENCH:NIFTY50",
+        asset_class="Benchmark",
+        currency="INR",
+        status="Active",
+    )
+    # No INR→USD rate in the book: the comparison is reported, not guessed.
+    result = services_mod.benchmark_return("p1", "NIFTY50", as_of=date(2026, 3, 1))
+    assert result["benchmark_return_ytd"] is None
+    assert "No FX rate" in result["note"]
+
+
+def test_benchmark_return_rejects_unknown_codes(services):
+    services_mod, fake, store = services
+    with pytest.raises(ValueError, match="Unknown benchmark"):
+        services_mod.benchmark_return("p1", "MOON100", as_of=date(2026, 3, 1))
+
+
+def test_benchmark_security_is_created_outside_license_class_count(services):
+    services_mod, fake, store = services
+    from frappe_investing.core import benchmarks
+
+    name = services_mod._benchmark_security(benchmarks.get("SP500"))
+    row = store[name]
+    assert row.asset_class == "Benchmark"
+    assert row.ticker == "BENCH:SP500"
+    assert row.currency == "USD"
+    # Idempotent: a second lookup returns the same row.
+    assert services_mod._benchmark_security(benchmarks.get("SP500")) == name
 
 
 def test_sync_event_payload_carries_connection(services, monkeypatch):

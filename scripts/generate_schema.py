@@ -109,7 +109,7 @@ def main():
             {"title": "security_name"},
             [
                 field("security_name", reqd=1, in_list_view=1),
-                select("asset_class", ["Stock", "ETF", "Bond", "Fund", "Crypto"], reqd=1, in_list_view=1),
+                select("asset_class", ["Stock", "ETF", "Bond", "Fund", "Crypto", "Benchmark"], reqd=1, in_list_view=1),
                 link("currency", "Currency", reqd=1),
                 field("ticker", in_list_view=1),
                 link("exchange", "Exchange"),

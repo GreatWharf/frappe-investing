@@ -128,6 +128,72 @@ def test_xirr_rejects_unsigned_flows():
         performance.xirr([(date(2025, 1, 1), D(100))], D(100), date(2026, 1, 1))
 
 
+def test_daily_returns_are_flow_adjusted():
+    # Deposit 500 on day 2 → day-2 return is 0, not 50%.
+    snaps = [
+        performance.Snapshot(day=date(2026, 1, 1), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 2), value=D(1500), external_flow=D(500)),
+        performance.Snapshot(day=date(2026, 1, 3), value=D(1575), external_flow=D(0)),
+    ]
+    rets = performance.daily_returns(snaps)
+    assert [day for day, _ in rets] == [date(2026, 1, 2), date(2026, 1, 3)]
+    assert rets[0][1] == D(0)
+    assert abs(rets[1][1] - D("0.05")) < D("0.000001")
+
+
+def test_daily_returns_skip_zero_base_days():
+    # A zero-value day cannot divide, but the flow-adjusted move is still 0.
+    snaps = [
+        performance.Snapshot(day=date(2026, 1, 1), value=D(0), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 2), value=D(100), external_flow=D(100)),
+        performance.Snapshot(day=date(2026, 1, 3), value=D(110), external_flow=D(0)),
+    ]
+    rets = performance.daily_returns(snaps)
+    assert [(day, r) for day, r in rets] == [
+        (date(2026, 1, 2), D(0)),
+        (date(2026, 1, 3), D("0.1")),
+    ]
+
+
+def test_sharpe_ratio_of_alternating_daily_moves():
+    snaps = [
+        performance.Snapshot(day=date(2026, 1, 1), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 2), value=D(1010), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 3), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 4), value=D(1010), external_flow=D(0)),
+    ]
+    sharpe = performance.sharpe_ratio(snaps)
+    # Returns alternate +1%/−0.99%; sample sigma ≈ 0.995%, mean ≈ 0.0033%.
+    assert sharpe is not None
+    assert sharpe == D("4.6510")  # (mean − rf)/sigma × √252, quantized to 4dp
+
+
+def test_sharpe_ratio_scales_down_with_risk_free_rate():
+    snaps = [
+        performance.Snapshot(day=date(2026, 1, 1), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 2), value=D(1010), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 3), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 4), value=D(1010), external_flow=D(0)),
+    ]
+    base = performance.sharpe_ratio(snaps, risk_free_annual=0)
+    taxed = performance.sharpe_ratio(snaps, risk_free_annual=D("0.10"))
+    assert taxed < base
+
+
+def test_sharpe_ratio_is_none_with_too_few_or_constant_returns():
+    one = [
+        performance.Snapshot(day=date(2026, 1, 1), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 2), value=D(1010), external_flow=D(0)),
+    ]
+    assert performance.sharpe_ratio(one) is None  # a single return has no variance
+    flat = [
+        performance.Snapshot(day=date(2026, 1, 1), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 2), value=D(1000), external_flow=D(0)),
+        performance.Snapshot(day=date(2026, 1, 3), value=D(1000), external_flow=D(0)),
+    ]
+    assert performance.sharpe_ratio(flat) is None  # zero variance, not infinite Sharpe
+
+
 def test_policy_maps_dividend_to_three_line_journal():
     policy = accounting.Policy(
         company_currency="GBP",

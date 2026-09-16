@@ -27,9 +27,12 @@ def has_permission():
 
 
 @frappe.whitelist()
-def get_dashboard(portfolio=None):
+def get_dashboard(portfolio=None, risk_free_rate=0):
     _user()
     settings = services.settings()
+    from frappe.utils import flt
+
+    risk_free_rate = flt(risk_free_rate)
     portfolios = frappe.get_all(
         "Portfolio", fields=["name", "portfolio_name", "company", "base_currency"], limit_page_length=200
     )
@@ -50,7 +53,7 @@ def get_dashboard(portfolio=None):
         }
     _check_portfolio(portfolio)
     values = services.value_portfolio(portfolio)
-    perf = services.performance_summary(portfolio)
+    perf = services.performance_summary(portfolio, risk_free_rate=risk_free_rate)
     connections = frappe.get_all(
         "Broker Connection",
         filters={"company": frappe.db.get_value("Portfolio", portfolio, "company")},
@@ -240,3 +243,36 @@ def sync_now(connection):
 def refresh_prices(provider=None):
     _manager()
     return sync_service.refresh_prices(provider)
+
+
+# ---------------------------------------------------------------- benchmarks
+@frappe.whitelist()
+def benchmark_list():
+    """The curated benchmark catalog, for the comparison picker."""
+    _user()
+    from .core import benchmarks
+
+    return [
+        {"code": b["code"], "name": b["name"], "currency": b["currency"]} for b in benchmarks.BENCHMARKS
+    ]
+
+
+@frappe.whitelist()
+def compare_benchmark(portfolio, benchmark, risk_free_rate=0):
+    """YTD portfolio performance against one benchmark index."""
+    _user()
+    _check_portfolio(portfolio)
+    from frappe.utils import flt
+
+    return services.benchmark_return(
+        portfolio, benchmark, risk_free_rate=flt(risk_free_rate)
+    )
+
+
+@frappe.whitelist(methods=["POST"])
+def refresh_benchmark_prices(codes=None):
+    _manager()
+    import json
+
+    code_list = json.loads(codes) if isinstance(codes, str) else codes
+    return sync_service.refresh_benchmark_prices(code_list)

@@ -38,10 +38,14 @@ def public_state():
 
 
 def used_asset_classes():
+    """Classes the user actually tracks; Benchmark rows are catalog, not holdings."""
     return sorted(
         set(
             frappe.get_all(
-                "Security", filters={"status": "Active"}, pluck="asset_class", distinct=True
+                "Security",
+                filters={"status": "Active", "asset_class": ["!=", "Benchmark"]},
+                pluck="asset_class",
+                distinct=True,
             )
         )
     )

@@ -3,7 +3,9 @@
 from dataclasses import dataclass
 from datetime import date
 
-from .money import dec
+from .money import dec, q
+
+TRADING_DAYS = 252
 
 
 @dataclass
@@ -68,3 +70,39 @@ def income_total(events, from_date=None, to_date=None):
         ):
             total += event.net_income()
     return total
+
+
+def daily_returns(snapshots):
+    """Per-day returns, with each day's external flow removed from the numerator.
+
+    Returns a list of (day, return) for consecutive snapshot pairs where the
+    invested base is non-zero. Decimal throughout.
+    """
+    returns = []
+    for prev, cur in zip(snapshots, snapshots[1:]):
+        base = dec(prev.value) + dec(cur.external_flow)
+        if base == 0:
+            continue
+        returns.append((cur.day, (dec(cur.value) - base) / base))
+    return returns
+
+
+def sharpe_ratio(snapshots, *, risk_free_annual=0, periods_per_year=TRADING_DAYS):
+    """Annualized Sharpe from per-day returns: mean(excess)/sigma × √periods.
+
+    Returns None when fewer than two usable daily returns exist or when the
+    return series has zero standard deviation (undefined, not 0 — a flat line
+    has no meaningful Sharpe). risk_free_annual is a ratio (0.04 = 4%).
+    """
+    returns = [r for _day, r in daily_returns(snapshots)]
+    if len(returns) < 2:
+        return None
+    n = dec(len(returns))
+    mean = sum(returns, dec(0)) / n
+    variance = sum((r - mean) ** 2 for r in returns) / (n - 1)  # sample
+    if variance == 0:
+        return None
+    sigma = variance.sqrt()
+    rf_daily = dec(risk_free_annual) / dec(periods_per_year)
+    sharpe = (mean - rf_daily) / sigma * dec(periods_per_year).sqrt()
+    return q(sharpe, 4)

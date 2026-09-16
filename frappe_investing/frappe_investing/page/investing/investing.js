@@ -159,6 +159,7 @@
 				try {
 					const data = await call("get_dashboard", { portfolio: state.portfolio });
 					state.data = data;
+					state.benchmarks = await call("benchmark_list");
 					if (!data.needs_setup) state.portfolio = data.portfolio;
 					render();
 				} catch (error) {
@@ -184,6 +185,7 @@
 			renderToolbar(data);
 			renderKpis(data);
 			renderUsage(data);
+			renderBenchmark(data);
 			renderAllocation(data);
 			renderHoldings(data);
 			renderConnections(data);
@@ -284,6 +286,12 @@
 			kpiCard(grid, __("YTD XIRR"),
 				perf.xirr_ytd === null || perf.xirr_ytd === undefined ? "—" : inv.formatPercent(perf.xirr_ytd),
 				inv.signClass(perf.xirr_ytd));
+			// Sharpe needs >=2 daily returns with variance; a flat or one-day
+			// series shows a dash, not a misleading zero.
+			kpiCard(grid, __("Sharpe (YTD)"),
+				perf.sharpe_ytd === null || perf.sharpe_ytd === undefined ? "—" : inv.num(perf.sharpe_ytd).toFixed(2),
+				inv.signClass(perf.sharpe_ytd),
+				perf.sharpe_ytd === null || perf.sharpe_ytd === undefined ? __("Needs varied daily snapshots") : null);
 			kpiCard(grid, __("Unrealized P&L"), inv.formatMoney(values.unrealized_pnl, base),
 				inv.signClass(values.unrealized_pnl));
 			// YTD realized P&L and income come from services.performance_summary
@@ -296,6 +304,97 @@
 			kpiCard(grid, __("Income (YTD)"),
 				income === null || income === undefined ? "—" : inv.formatMoney(income, base),
 				inv.signClass(income));
+		}
+
+		function renderBenchmark(data) {
+			const section = $('<section class="inv-section"></section>').appendTo(root);
+			$("<h2>").text(__("Compare to Benchmark")).appendTo(section);
+			const controls = $('<div class="inv-benchmark-controls">').appendTo(section);
+			const select = $('<select class="form-control">')
+				.attr("aria-label", __("Benchmark"))
+				.appendTo(controls);
+			$("<option>").attr("value", "").text(__("Choose a benchmark…")).appendTo(select);
+			state.benchmarks = state.benchmarks || [];
+			for (const b of state.benchmarks) {
+				$("<option>").attr("value", b.code).text(b.name).appendTo(select);
+			}
+			if (state.benchmark) select.val(state.benchmark);
+			if (inv.isManager()) {
+				$('<button type="button" class="btn btn-default btn-sm">')
+					.text(__("Refresh Prices"))
+					.on("click", async (e) => {
+						const btn = $(e.currentTarget).prop("disabled", true);
+						try {
+							const r = await call("refresh_benchmark_prices");
+							const updated = Object.keys(r || {}).filter((k) => r[k] !== null).length;
+							frappe.show_alert({
+								message: __("Benchmark prices updated: {0}", [updated]),
+								indicator: updated ? "green" : "orange",
+							});
+							if (state.benchmark) select.trigger("change");
+						} catch (error) {
+							frappe.show_alert({
+								message: __("Benchmark price refresh failed."),
+								indicator: "red",
+							});
+						} finally {
+							btn.prop("disabled", false);
+						}
+					})
+					.appendTo(controls);
+			}
+			const out = $('<div class="inv-benchmark-result">').appendTo(section);
+			if (!state.benchmark) {
+				$('<p class="inv-muted">')
+					.text(__("Pick an index to compare this portfolio's YTD return against it."))
+					.appendTo(out);
+			}
+			select.on("change", async () => {
+				state.benchmark = select.val() || null;
+				out.empty();
+				if (!state.benchmark) {
+					$('<p class="inv-muted">')
+						.text(__("Pick an index to compare this portfolio's YTD return against it."))
+						.appendTo(out);
+					return;
+				}
+				$('<p class="inv-muted">').text(__("Comparing…")).appendTo(out);
+				try {
+					const r = await call("compare_benchmark", {
+						portfolio: state.portfolio,
+						benchmark: state.benchmark,
+					});
+					renderBenchmarkResult(out, r);
+				} catch (error) {
+					out.empty();
+					$('<p class="inv-muted">').text(__("The comparison could not be computed.")).appendTo(out);
+				}
+			});
+		}
+
+		function renderBenchmarkResult(out, r) {
+			out.empty();
+			const table = $('<table class="inv-table inv-benchmark-table">').appendTo(out);
+			const tbody = $("<tbody>").appendTo(table);
+			const row = (label, value, cls) => {
+				const tr = $("<tr>").appendTo(tbody);
+				$("<td>").text(label).appendTo(tr);
+				$("<td>").addClass("inv-num").addClass(cls || "").text(value).appendTo(tr);
+			};
+			row(__("{0} (YTD)", [r.benchmark_name || r.benchmark]), inv.formatPercent(r.benchmark_return_ytd),
+				inv.signClass(r.benchmark_return_ytd));
+			row(__("This portfolio (TWR, YTD)"), inv.formatPercent(r.portfolio_twr_ytd),
+				inv.signClass(r.portfolio_twr_ytd));
+			if (r.excess_return_ytd !== null && r.excess_return_ytd !== undefined) {
+				row(__("Excess vs benchmark"), inv.formatPercent(r.excess_return_ytd),
+					inv.signClass(r.excess_return_ytd));
+			}
+			if (r.note) $('<p class="inv-muted">').text(r.note).appendTo(out);
+			if (r.benchmark_currency && r.base_currency && r.benchmark_currency !== r.base_currency) {
+				$('<p class="inv-section-sub">')
+					.text(__("Benchmark converted from {0} to {1} at your FX rates.", [r.benchmark_currency, r.base_currency]))
+					.appendTo(out);
+			}
 		}
 
 		function renderUsage(data) {

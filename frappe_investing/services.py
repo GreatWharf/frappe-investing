@@ -427,8 +427,8 @@ def _period_totals(portfolio_name, day):
     return realized, income_amt
 
 
-def performance_summary(portfolio_name, as_of=None):
-    """YTD TWR + XIRR from snapshots and external flows."""
+def performance_summary(portfolio_name, as_of=None, risk_free_rate=0):
+    """YTD TWR + XIRR + Sharpe from snapshots and external flows."""
     as_of = as_of or today()
     start = date(date.fromisoformat(str(as_of)).year, 1, 1)
     snaps = [
@@ -466,9 +466,12 @@ def performance_summary(portfolio_name, as_of=None):
     except ValueError:
         xirr = None
     realized, income_amt = _period_totals(portfolio_name, as_of)
+    sharpe = performance.sharpe_ratio(snaps, risk_free_annual=risk_free_rate)
     return {
         "twr_ytd": twr,
         "xirr_ytd": xirr,
+        "sharpe_ytd": sharpe,
+        "risk_free_rate": dec(risk_free_rate),
         "realized_pnl_ytd": realized,
         "income_ytd": income_amt,
         "snapshots": len(snaps),
@@ -477,6 +480,114 @@ def performance_summary(portfolio_name, as_of=None):
 
 def _flow_sign(row):
     return dec(row.amount) if row.event_type == "Deposit" else -dec(row.amount)
+
+
+def benchmark_return(portfolio_name, benchmark_code, as_of=None, risk_free_rate=0):
+    """Portfolio YTD performance against a benchmark index over the same window.
+
+    The benchmark's price return is expressed in the portfolio's base currency
+    (FX-converted through the RateBook, like valuations). A benchmark with no
+    usable price on the window's start or end is reported, not fabricated.
+    """
+    from .core import benchmarks
+
+    as_of = as_of or today()
+    bench = benchmarks.get(benchmark_code)
+    if bench is None:
+        raise InvestingError(f"Unknown benchmark: {benchmark_code}")
+    summary = performance_summary(portfolio_name, as_of=as_of, risk_free_rate=risk_free_rate)
+    base = _portfolio_base_currency(portfolio_name)
+    start = date(date.fromisoformat(str(as_of)).year, 1, 1)
+    security = _benchmark_security(bench)
+    result = {
+        "benchmark": bench["code"],
+        "benchmark_name": bench["name"],
+        "benchmark_currency": bench["currency"],
+        "base_currency": base,
+        "portfolio_twr_ytd": summary["twr_ytd"],
+        "benchmark_return_ytd": None,
+        "excess_return_ytd": None,
+        "benchmark_start": None,
+        "benchmark_end": None,
+        "note": None,
+    }
+    start_price = _price_on(security, start, direction="gte")
+    end_price = _price_on(security, as_of, direction="lte")
+    if start_price is None or end_price is None:
+        result["note"] = "Benchmark has no price on the start or end of this period yet."
+        return result
+    result["benchmark_start"] = str(start_price["close"])
+    result["benchmark_end"] = str(end_price["close"])
+    book = _rate_book(_portfolio_company(portfolio_name))
+    try:
+        start_base = book.convert_on_or_before(
+            dec(start_price["close"]), bench["currency"], base, start_price["date"]
+        )
+        end_base = book.convert_on_or_before(
+            dec(end_price["close"]), bench["currency"], base, end_price["date"]
+        )
+    except Exception:
+        result["note"] = f"No FX rate to convert {bench['currency']} into {base}."
+        return result
+    bench_return = (end_base - start_base) / start_base
+    result["benchmark_return_ytd"] = bench_return
+    if summary["twr_ytd"] is not None:
+        result["excess_return_ytd"] = dec(summary["twr_ytd"]) - bench_return
+    return result
+
+
+def _price_on(security, day, *, direction):
+    """Nearest stored price on (or just inside) a date, never fabricated."""
+    op = ">=" if direction == "gte" else "<="
+    order = "date asc" if direction == "gte" else "date desc"
+    rows = frappe.get_all(
+        "Security Price",
+        filters={"security": security, "date": [op, day]},
+        fields=["close", "date"],
+        order_by=order,
+        limit_page_length=1,
+    )
+    return rows[0] if rows else None
+
+
+def _benchmark_security(bench):
+    """Find or create the Security row a benchmark's prices attach to.
+
+    Benchmarks use asset class "Benchmark", which is excluded from the
+    license's class count and from portfolio holdings (they hold no lots).
+    """
+    existing = frappe.db.get_value("Security", {"ticker": f"BENCH:{bench['code']}"}, "name")
+    if existing:
+        return existing
+    frappe.flags.investing_internal = True
+    try:
+        return (
+            frappe.get_doc(
+                {
+                    "doctype": "Security",
+                    "security_name": bench["name"],
+                    "ticker": f"BENCH:{bench['code']}",
+                    "asset_class": "Benchmark",
+                    "currency": bench["currency"],
+                    "status": "Active",
+                }
+            )
+            .insert(ignore_permissions=True)
+            .name
+        )
+    finally:
+        frappe.flags.investing_internal = False
+
+
+def _portfolio_base_currency(portfolio_name):
+    portfolio = frappe.get_doc("Portfolio", portfolio_name)
+    return portfolio.base_currency or frappe.get_cached_value(
+        "Company", portfolio.company, "default_currency"
+    )
+
+
+def _portfolio_company(portfolio_name):
+    return frappe.db.get_value("Portfolio", portfolio_name, "company")
 
 
 def rebuild_positions(account_name, security_name):

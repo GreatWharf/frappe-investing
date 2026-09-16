@@ -259,6 +259,56 @@ def refresh_prices(provider=None, securities=None):
     return {"updated": updated}
 
 
+def refresh_benchmark_prices(codes=None, day=None):
+    """Fetch benchmark index prices from Stooq (free, no key) and store them.
+
+    Idempotent per benchmark/day. Benchmarks are catalog Securities; their
+    prices attach to the BENCH:<code> ticker. Returns {code: close or None}.
+    """
+    from .core import benchmarks
+    from .services import _benchmark_security
+
+    day = day or frappe.utils.today()
+    wanted = [benchmarks.get(c) for c in (codes or benchmarks.codes())]
+    wanted = [b for b in wanted if b]
+    if not wanted:
+        return {}
+    adapter = stooq.StooqProvider()
+    out = {}
+    for bench in wanted:
+        security = _benchmark_security(bench)
+        if frappe.db.exists("Security Price", {"security": security, "date": day}):
+            out[bench["code"]] = frappe.db.get_value(
+                "Security Price", {"security": security, "date": day}, "close"
+            )
+            continue
+        try:
+            quotes = adapter.daily_prices([bench["stooq"]], day)
+        except MarketDataError as exc:
+            frappe.log_error(title=f"Benchmark price failed for {bench['code']}", message=str(exc))
+            out[bench["code"]] = None
+            continue
+        if not quotes:
+            out[bench["code"]] = None
+            continue
+        frappe.flags.investing_internal = True
+        try:
+            frappe.get_doc(
+                {
+                    "doctype": "Security Price",
+                    "security": security,
+                    "date": day,
+                    "close": quotes[0]["close"],
+                    "currency": bench["currency"],
+                    "source": "Stooq",
+                }
+            ).insert(ignore_permissions=True)
+        finally:
+            frappe.flags.investing_internal = False
+        out[bench["code"]] = quotes[0]["close"]
+    return out
+
+
 def scheduled_broker_sync():
     if not settings().broker_sync_enabled:
         return

@@ -19,7 +19,7 @@
       "fieldname": "asset_class",
       "label": "Asset Class",
       "fieldtype": "Select",
-      "options": "Stock\nETF\nBond\nFund\nCrypto",
+      "options": "Stock\nETF\nBond\nFund\nCrypto\nBenchmark",
       "reqd": 1,
       "in_list_view": 1
     },

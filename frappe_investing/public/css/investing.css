@@ -350,6 +350,26 @@ table.inv-table tbody tr:hover {
 	color: var(--text-muted);
 }
 
+/* Benchmark picker: select and action share one balanced row. */
+.inv-benchmark-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--padding-sm) var(--padding-md);
+	margin-bottom: var(--padding-md);
+}
+
+.inv-benchmark-controls select.form-control {
+	width: auto;
+	min-width: 200px;
+	max-width: 320px;
+	margin-bottom: 0;
+}
+
+table.inv-benchmark-table {
+	max-width: 520px;
+}
+
 .inv-list-plain {
 	list-style: none;
 	margin: 0;

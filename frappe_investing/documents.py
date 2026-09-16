@@ -48,7 +48,7 @@ class ManagedDocument(Document):
 
     # -- Security ---------------------------------------------------------
     def _validate_security(self):
-        if self.is_new() and self.asset_class:
+        if self.is_new() and self.asset_class and self.asset_class != "Benchmark":
             from .license_service import require_asset_class
 
             require_asset_class(self.asset_class)

@@ -82,6 +82,24 @@ function deskWithDashboard({ roles = ["Investment Manager"], dashboard, extra = 
 				if (args && args.portfolio) reply.portfolio = args.portfolio;
 				return { message: reply };
 			},
+			"frappe_investing.api.benchmark_list": () => ({
+				message: [
+					{ code: "SP500", name: "S&P 500", currency: "USD" },
+					{ code: "NIFTY50", name: "Nifty 50", currency: "INR" },
+				],
+			}),
+			"frappe_investing.api.compare_benchmark": (args) => ({
+				message: {
+					benchmark: args.benchmark,
+					benchmark_name: args.benchmark === "NIFTY50" ? "Nifty 50" : "S&P 500",
+					benchmark_currency: args.benchmark === "NIFTY50" ? "INR" : "USD",
+					base_currency: "INR",
+					portfolio_twr_ytd: "0.0523",
+					benchmark_return_ytd: "0.0310",
+					excess_return_ytd: "0.0213",
+					note: null,
+				},
+			}),
 			...extra,
 		}),
 	});
@@ -164,6 +182,76 @@ test("stale holding shows a Stale badge instead of a price", async () => {
 	const row = badge.parent.parent;
 	assert.equal(row.children[3].textValue, "—"); // market value
 	assert.equal(row.children[5].textValue.includes("0.00"), true); // unrealized P&L is 0, not missing
+});
+
+test("benchmark section lists indexes and compares on selection", async () => {
+	const desk = deskWithDashboard();
+	await loadDashboardPage(desk);
+
+	// The picker is populated from benchmark_list with a neutral placeholder first.
+	const selectEl = desk.find("select").toArray().find((el) =>
+		el.descendants().some((d) => d.tag === "option" && d.textValue === "Nifty 50")
+	);
+	assert.ok(selectEl, "benchmark select rendered with catalog options");
+	const optionValues = selectEl.descendants()
+		.filter((d) => d.tag === "option")
+		.map((d) => d.attributes.value);
+	assert.deepEqual(optionValues, ["", "SP500", "NIFTY50"]);
+	// Nothing selected yet: an explanatory hint, no comparison call.
+	assert.ok(desk.texts().some((t) => /Pick an index to compare/.test(t)));
+	assert.equal(desk.callsTo("compare_benchmark").length, 0);
+
+	// Selecting an index calls compare_benchmark and renders the three rows.
+	selectEl.value = "NIFTY50";
+	selectEl.trigger("change");
+	await desk.flush();
+	assert.equal(desk.callsTo("compare_benchmark").length, 1);
+	assert.equal(desk.callsTo("compare_benchmark")[0].args.benchmark, "NIFTY50");
+	const table = desk.find(".inv-benchmark-table").get(0);
+	assert.ok(table, "comparison table rendered");
+	const text = table.allText();
+	assert.ok(text.includes("Nifty 50 (YTD)"));
+	assert.ok(text.includes("3.10%"), "benchmark return shown");
+	assert.ok(text.includes("This portfolio (TWR, YTD)"));
+	assert.ok(text.includes("5.23%"), "portfolio TWR shown");
+	assert.ok(text.includes("Excess vs benchmark"));
+	assert.ok(text.includes("2.13%"), "excess return shown");
+
+	// Clearing the selection returns to the hint without a further call.
+	selectEl.value = "";
+	selectEl.trigger("change");
+	await desk.flush();
+	assert.equal(desk.callsTo("compare_benchmark").length, 1, "no call without a selection");
+});
+
+test("benchmark note renders when index prices are missing", async () => {
+	const desk = deskWithDashboard({
+		extra: {
+			"frappe_investing.api.compare_benchmark": (args) => ({
+				message: {
+					benchmark: args.benchmark,
+					benchmark_name: "S&P 500",
+					benchmark_currency: "USD",
+					base_currency: "INR",
+					portfolio_twr_ytd: "0.0523",
+					benchmark_return_ytd: null,
+					excess_return_ytd: null,
+					note: "No stored prices for S&P 500; refresh benchmark prices first.",
+				},
+			}),
+		},
+	});
+	await loadDashboardPage(desk);
+	const selectEl = desk.find("select").toArray().find((el) =>
+		el.descendants().some((d) => d.tag === "option" && d.textValue === "S&P 500")
+	);
+	selectEl.value = "SP500";
+	selectEl.trigger("change");
+	await desk.flush();
+	assert.ok(
+		desk.texts().some((t) => /No stored prices for S&P 500/.test(t)),
+		"missing-prices note shown instead of a fabricated number"
+	);
 });
 
 test("license dialog is gated to managers", async () => {

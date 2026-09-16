@@ -104,3 +104,21 @@ def test_fx_missing_rate_fails_loudly():
 
 def test_fx_same_currency_is_identity():
     assert fx.RateBook().convert(D(7), "USD", "USD", date(2026, 1, 1)) == D(7)
+
+
+def test_fx_on_or_before_uses_the_latest_prior_rate():
+    book = fx.RateBook()
+    book.set("INR", "USD", date(2026, 1, 1), D("0.012"))
+    book.set("INR", "USD", date(2026, 2, 1), D("0.013"))
+    assert book.convert_on_or_before(D(100), "INR", "USD", date(2026, 2, 15)) == D("1.3")
+    assert book.convert_on_or_before(D(100), "INR", "USD", date(2026, 1, 15)) == D("1.2")
+    # Inversion applies to the as-of lookup too (within division precision).
+    inverted = book.convert_on_or_before(D("1.3"), "USD", "INR", date(2026, 2, 15))
+    assert abs(inverted - D(100)) < D("0.000001")
+
+
+def test_fx_on_or_before_fails_loudly_when_nothing_predates():
+    book = fx.RateBook()
+    book.set("INR", "USD", date(2026, 2, 1), D("0.013"))
+    with pytest.raises(fx.MissingRate):
+        book.rate_on_or_before("INR", "USD", date(2026, 1, 15))
