@@ -36,11 +36,11 @@ Investing is a comprehensive investment management system for ERPNext. Track sto
 
 | | Free | Pro |
 |---|---|---|
-| All asset classes, connectors, corporate actions, accounting | ✓ | ✓ |
-| **Asset classes tracked at once** | **1** | **5** |
-| **Portfolio value cap** | none | per license |
+| Every connector, corporate action, tax-lot method, report and the accounting integration | ✓ | ✓ |
+| Stocks, ETFs, bonds, funds and crypto | ✓ | ✓ |
+| **Asset classes tracked at once** | **1** | **unlimited** |
 
-Every tier has every feature; tiers differ only in how many asset classes you track at once and an optional portfolio-value cap.
+One paid plan, and it covers everything. Both tiers have every feature; they differ only in how many asset classes you track at once.
 
 On Frappe Cloud there is nothing to install: pick a plan and the app reads it back from your subscription, so changing plans just works. Self-hosted sites activate with an offline-signed license key, verified locally with no data leaving your site. Open source means this is a commercial control, not DRM; see [Tiers & Licensing](docs/tiers.md) for the honest version.
 

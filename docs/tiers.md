@@ -2,17 +2,19 @@
 
 ## What the tiers are
 
-Tiers are defined by **how much you track**, not which features you unlock. Every tier
-includes every feature: all broker connectors, CSV import, corporate actions, tax lots,
-TWR/XIRR, Sharpe, benchmarks, and the accounting integration. What changes with the tier
-is scope:
+There are two: **Free** and **Pro**. There is one paid plan, and it covers everything.
 
-- **Asset classes** — how many of the five asset classes (Stock, ETF, Bond, Fund, Crypto)
-  you may track at once. The free tier covers **1**; Pro covers **5**; custom licenses can
-  carry any count, or none (unlimited).
-- **Portfolio value cap (optional)** — a license may cap the tracked portfolio value, stated
-  in a reference currency (e.g. $500,000 USD). Valuations convert through the FX RateBook
-  to compare, exactly like portfolio reporting does.
+Tiers are defined by **how much you track**, not which features you unlock. Both tiers
+include every feature: all broker connectors, CSV import, corporate actions, tax lots,
+TWR/XIRR, Sharpe, benchmarks, crypto, and the accounting integration. What changes is scope:
+
+- **Asset classes** — how many of Stock, ETF, Bond, Fund and Crypto you may track at once.
+  Free covers **1**; Pro is **unlimited**. Pro's limit is stated as unlimited rather than as
+  today's count of five, so adding a sixth asset class later cannot retroactively put a
+  paying customer over their limit.
+- **Portfolio value cap (optional)** — a custom license may cap the tracked portfolio value,
+  stated in a reference currency (e.g. $500,000 USD). Valuations convert through the FX
+  RateBook to compare, exactly like portfolio reporting does. Neither published tier sets one.
 
 The free tier is 1 asset class with no value cap, forever, MIT-licensed.
 
@@ -31,10 +33,14 @@ follows; there is no key to paste, request, or renew.
 What Frappe Cloud does **not** do is enforce anything. A plan's "Features" list is marketing
 copy, and press will not switch app behaviour on it (the official docs are explicit: "It is
 not possible to do feature isolation based on paid or free App Plans"). So the app reads the
-plan *name* and applies the tier itself. Plan names map to tiers in
-`marketplace.PLAN_TIERS`; renaming a plan on the listing without adding it there would
-downgrade paying sites, and the dashboard names any plan it does not recognise instead of
-guessing a tier in either direction.
+plan *name* and applies the tier itself.
+
+Because there is only one paid plan, that mapping fails toward the paying customer: a plan
+name that is not in `marketplace.FREE_PLANS` grants Pro, whether or not this build has seen
+the name before. Renaming the plan on the listing therefore cannot downgrade someone who is
+being billed — and the opposite mistake, a free-plan site getting Pro, costs one subscription
+rather than a refund and a lost customer. Introducing a cheaper paid tier means naming it in
+`marketplace.PLAN_TIERS` first.
 
 ### Everywhere else: an offline-signed key
 
@@ -83,13 +89,18 @@ maintenance and trust.
 
 ## For the publisher
 
-Name the Marketplace plans so they normalize onto `marketplace.PLAN_TIERS`: leading "Frappe"
-and "Investing" and trailing "Plan", "Monthly", "Annual" and "Yearly" are stripped before
-lookup, so "Frappe Investing Pro Monthly", "Pro Plan" and "Pro" all reach the `pro` tier.
-Adding a plan means adding its normalized name to that map.
+The listing carries one paid plan. Name it anything — leading "Frappe" and "Investing" and
+trailing "Plan", "Monthly", "Annual" and "Yearly" are stripped before lookup, so "Frappe
+Investing Pro Monthly", "Pro Plan" and "Pro" all reach the `pro` tier, and an unlisted name
+reaches it too. A **free** plan is the one thing that must be named exactly: its normalized
+name has to be in `marketplace.FREE_PLANS` (`free` or `trial`), or its subscribers get Pro.
+
+Crypto ships in the paid tier for now. Splitting it into a separately-priced add-on is a
+later change, and it needs a second plan name in `PLAN_TIERS` plus per-class enforcement —
+not a code deletion.
 
 `scripts/make_license.py` covers the non-Cloud side: it generates the keypair (private key to
 a 0600 file, never printed) and signs customer licenses. Tier presets (`standard` = 1 class,
-`pro` = 5) can be overridden per customer with `--max-asset-classes N --max-value V
+`pro` = unlimited) can be overridden per customer with `--max-asset-classes N --max-value V
 --value-currency CCC`. The production public key replaces `licensing.PUBLIC_KEY` at release
 time. CI must never contain the private key.

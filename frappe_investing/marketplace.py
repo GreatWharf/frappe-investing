@@ -18,9 +18,8 @@ is marketing copy; press will not switch app behaviour on it. This module
 turns the plan *name* into a tier, and the app enforces the tier itself.
 
 Plan names are free text from the publisher's Marketplace listing, so
-`PLAN_TIERS` maps the published names onto tiers. An unrecognised plan grants
-nothing and is reported back by name rather than guessing a tier in either
-direction.
+`PLAN_TIERS` maps the published names onto tiers. The listing has one paid
+plan, so anything that is not a named free plan grants it; see FREE_PLANS.
 """
 
 import requests
@@ -34,16 +33,19 @@ DEFAULT_BASE_URL = "https://frappecloud.com"
 API_PATH = "/api/method/press.api.developer.marketplace.get_subscription_info"
 TIMEOUT = 10
 
-# Published Marketplace plan names, normalized, mapped onto tiers. Keep this in
-# step with the plans on the listing; renaming a plan there without adding it
-# here downgrades paying sites to the free limits.
+# The listing carries a single paid plan, so any enabled subscription that is
+# not on a named free plan grants everything. That fails toward the paying
+# customer on purpose: renaming the plan on the listing must never downgrade
+# someone who is being billed, and the alternative failure — a free-plan site
+# getting the paid tier — costs one subscription rather than a refund and a
+# lost customer. Introducing a cheaper paid tier means naming it here first.
+FREE_PLANS = {"", "free", "trial"}
 PLAN_TIERS = {
-    "free": "standard",
-    "standard": "standard",
-    "starter": "standard",
+    "standard": "pro",
     "pro": "pro",
     "professional": "pro",
 }
+PAID_DEFAULT = "pro"
 
 # Words stripped off a plan name before lookup, so "Frappe Investing Pro Monthly"
 # and "Pro" reach the same tier.
@@ -65,8 +67,11 @@ def normalize_plan(plan):
 
 
 def plan_tier(plan):
-    """The tier a published plan name maps to, or None when it is unrecognised."""
-    return PLAN_TIERS.get(normalize_plan(plan))
+    """The tier a published plan name maps to. Unknown paid names get PAID_DEFAULT."""
+    name = normalize_plan(plan)
+    if name in FREE_PLANS:
+        return "standard"
+    return PLAN_TIERS.get(name, PAID_DEFAULT)
 
 
 def fetch_subscription(secret_key, *, base_url=DEFAULT_BASE_URL, timeout=TIMEOUT, transport=None):
@@ -99,17 +104,16 @@ def _post(url, data, timeout):
 
 
 def subscription_state(info):
-    """A LicenseState for an active subscription, or None when it grants nothing.
+    """A LicenseState for an active subscription, or None when there is none.
 
-    None covers every "no paid tier here" case — no subscription, a disabled
-    one, or a plan name this build does not recognise — and leaves the caller's
-    fallback (the license key, else the free tier) in charge.
+    None means no subscription at all, or a disabled one, and leaves the
+    caller's fallback (the license key, else the free tier) in charge. A live
+    subscription on a free plan is not None: it is an honest `standard` state,
+    so the dashboard can name the plan the limits came from.
     """
-    if not info or not info.get("enabled"):
+    if not info or not info.get("enabled") or not info.get("plan"):
         return None
-    tier = plan_tier(info.get("plan"))
-    if tier is None:
-        return None
+    tier = plan_tier(info["plan"])
     classes, value, currency = licensing.tier_limits(tier)
     return licensing.LicenseState(
         status="active",

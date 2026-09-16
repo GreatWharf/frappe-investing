@@ -213,8 +213,8 @@ def _read_plan(info):
     plan, site = info.get("plan") or "", info.get("site") or ""
     if not info.get("enabled"):
         return "", site, "Your Frappe Cloud subscription is not active."
-    if marketplace.plan_tier(plan) is None:
-        return "", site, f"Frappe Cloud plan '{plan}' is not one this version knows; update the app."
+    if not plan:
+        return "", site, "Frappe Cloud reported a subscription with no plan."
     return plan, site, f"Plan '{plan}' read from your Frappe Cloud subscription."
 
 

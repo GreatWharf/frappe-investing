@@ -283,7 +283,7 @@ test("a Frappe Cloud plan shows its own name and needs no license key", async ()
 	const data = dashboardFixture();
 	data.license = {
 		tier: "pro", status: "active", source: "cloud", customer: "acme.frappe.cloud",
-		expires: "", max_asset_classes: 5, max_value: null, value_currency: null,
+		expires: "", max_asset_classes: null, max_value: null, value_currency: null,
 		cloud_managed: true, cloud_plan: "Pro", cloud_site: "acme.frappe.cloud", cloud_note: "",
 	};
 	const desk = deskWithDashboard({
@@ -295,7 +295,10 @@ test("a Frappe Cloud plan shows its own name and needs no license key", async ()
 		desk.texts().some((t) => /From your Frappe Cloud plan Pro/.test(t)),
 		"the card names the plan the tier came from",
 	);
-	assert.ok(desk.texts().some((t) => /Covers 5 asset class/.test(t)), "limits are spelled out");
+	assert.ok(
+		desk.texts().some((t) => /Covers unlimited asset classes/.test(t)),
+		"the one paid plan covers everything",
+	);
 	assert.ok(
 		!desk.texts().some((t) => /Licensed to/.test(t)),
 		"a Cloud site is never described as key-licensed",
@@ -308,18 +311,18 @@ test("a Frappe Cloud plan shows its own name and needs no license key", async ()
 	assert.equal(desk.callsTo("refresh_license").length, 1);
 });
 
-test("an unrecognised Cloud plan is reported rather than silently ignored", async () => {
+test("a lapsed Cloud subscription says so and points at the Frappe Cloud dashboard", async () => {
 	const data = dashboardFixture();
 	data.license = {
 		tier: "standard", status: "none", source: "none", customer: "", expires: "",
 		max_asset_classes: 1, max_value: null, value_currency: null,
 		cloud_managed: true, cloud_plan: "",
 		cloud_site: "acme.frappe.cloud",
-		cloud_note: "Frappe Cloud plan 'Enterprise' is not one this version knows; update the app.",
+		cloud_note: "Your Frappe Cloud subscription is not active.",
 	};
 	const desk = deskWithDashboard({ dashboard: data });
 	await loadDashboardPage(desk);
-	assert.ok(desk.texts().some((t) => /'Enterprise' is not one this version knows/.test(t)));
+	assert.ok(desk.texts().some((t) => /subscription is not active/.test(t)));
 	assert.ok(
 		desk.texts().some((t) => /Choose a paid plan in Frappe Cloud/.test(t)),
 		"a Cloud site is pointed at its dashboard, not at a license key",

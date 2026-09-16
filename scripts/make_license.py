@@ -5,7 +5,7 @@ Usage:
   python scripts/make_license.py --private-key-file ~/.keys/finv-license.pem --tier pro --customer "Acme" --expires 2027-09-16
   python scripts/make_license.py ... --max-asset-classes 2 --max-value 500000 --value-currency USD
 
-Tiers are tracking limits: ``standard`` covers 1 asset class, ``pro`` 5.
+Tiers are tracking limits: ``standard`` covers 1 asset class, ``pro`` unlimited.
 The --max-* flags override the tier defaults in the signed payload, so custom
 deals (e.g. 3 classes, capped at $250k tracked value) need no code change.
 The private key is written to a 0600 file and is never printed.

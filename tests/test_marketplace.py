@@ -37,16 +37,23 @@ def transport_raising(exc):
         ("pro-annual", "pro"),
         ("Free", "standard"),
         ("Investing Free Plan", "standard"),
-        ("Starter", "standard"),
+        ("Trial", "standard"),
     ],
 )
 def test_published_plan_names_map_to_tiers(plan, tier):
     assert marketplace.plan_tier(plan) == tier
 
 
-@pytest.mark.parametrize("plan", ["Enterprise", "", None, "Investing", "pro max"])
-def test_unknown_plan_maps_to_nothing(plan):
-    assert marketplace.plan_tier(plan) is None
+@pytest.mark.parametrize("plan", ["Enterprise", "Starter", "pro max", "Unlimited", "$5"])
+def test_an_unknown_plan_name_still_pays_for_everything(plan):
+    # One paid plan on the listing, so a name this build has not seen means it
+    # was renamed, not that the customer stopped paying.
+    assert marketplace.plan_tier(plan) == "pro"
+
+
+@pytest.mark.parametrize("plan", ["", None, "Investing"])
+def test_a_plan_that_normalizes_to_nothing_is_the_free_tier(plan):
+    assert marketplace.plan_tier(plan) == "standard"
 
 
 # ------------------------------------------------------------ fetching
@@ -100,16 +107,24 @@ def test_enabled_pro_subscription_grants_the_pro_tier():
     assert state.max_asset_classes == licensing.tier_limits("pro")[0]
 
 
+def test_a_free_plan_is_an_honest_standard_state_not_none():
+    # The dashboard needs to name the plan the limits came from, so a live
+    # subscription on the free plan is a state rather than a hole.
+    state = marketplace.subscription_state({"plan": "Free", "site": "acme.frappe.cloud", "enabled": True})
+    assert state.tier == "standard"
+    assert state.source == "cloud"
+    assert state.max_asset_classes == 1
+
+
 @pytest.mark.parametrize(
     "info",
     [
         None,
         {"plan": "Pro", "enabled": False},
-        {"plan": "Enterprise", "enabled": True},
         {"plan": "", "enabled": True},
     ],
 )
-def test_subscription_granting_nothing_returns_none(info):
+def test_no_live_subscription_returns_none(info):
     assert marketplace.subscription_state(info) is None
 
 

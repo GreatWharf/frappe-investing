@@ -29,11 +29,11 @@ def make_license(private, **payload):
     return licensing.sign_license(full, private)
 
 
-def test_pro_license_defaults_to_five_classes_no_value_cap(keypair):
+def test_pro_license_is_unlimited_by_default(keypair):
     state = licensing.evaluate(make_license(keypair), on=date(2027, 1, 1))
     assert state.status == "active"
     assert state.tier == "pro"
-    assert state.max_asset_classes == 5
+    assert state.max_asset_classes is None
     assert state.max_value is None
     assert state.value_currency is None
 

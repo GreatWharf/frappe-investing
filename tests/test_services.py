@@ -625,7 +625,7 @@ def test_a_cloud_plan_sets_the_tier_with_no_license_key(services):
     state = license_mod.current_state()
     assert state.tier == "pro"
     assert state.source == "cloud"
-    assert state.max_asset_classes == 5
+    assert state.max_asset_classes is None
     assert services[2]["Investment License"].license_key == ""
 
 
@@ -672,12 +672,24 @@ def test_refresh_clears_the_plan_when_the_subscription_is_disabled(services, mon
     assert "not active" in public["cloud_note"]
 
 
-def test_refresh_names_a_plan_this_build_does_not_know(services, monkeypatch):
+def test_a_renamed_paid_plan_still_grants_the_paid_tier(services, monkeypatch):
+    # One paid plan on the listing: a name this build has not seen means the
+    # listing was renamed, not that the customer stopped paying.
     license_mod = _cloud_mod(services)
-    _press_returns(monkeypatch, plan="Enterprise", site="acme.frappe.cloud", enabled=True)
+    _press_returns(monkeypatch, plan="Investing $5", site="acme.frappe.cloud", enabled=True)
+    public = license_mod.refresh_cloud_subscription()
+    assert public["tier"] == "pro"
+    assert public["source"] == "cloud"
+    assert "Investing $5" in public["cloud_note"]
+
+
+def test_a_free_plan_subscription_stays_on_the_free_limits(services, monkeypatch):
+    license_mod = _cloud_mod(services)
+    _press_returns(monkeypatch, plan="Free", site="acme.frappe.cloud", enabled=True)
     public = license_mod.refresh_cloud_subscription()
     assert public["tier"] == "standard"
-    assert "Enterprise" in public["cloud_note"]
+    assert public["max_asset_classes"] == 1
+    assert public["cloud_plan"] == "Free"
 
 
 def test_a_failed_refresh_keeps_the_cached_plan_and_its_timestamp(services, monkeypatch):

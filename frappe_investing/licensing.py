@@ -33,9 +33,12 @@ PREFIX = "FINV1"
 PUBLIC_KEY = ""
 
 # (max_asset_classes, max_value, value_currency); None means no limit.
+# One paid plan, and it covers everything — stated as unlimited rather than as
+# today's class count, so adding a sixth asset class cannot retroactively put
+# paying customers over their limit.
 _TIER_LIMITS = {
     "standard": (1, None, None),
-    "pro": (5, None, None),
+    "pro": (None, None, None),
 }
 
 
