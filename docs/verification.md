@@ -4,9 +4,10 @@
 
 | Check | Result |
 |---|---|
-| Offline pytest suite (core engine, lots, corporate actions, income, bonds, FX, valuation, TWR/XIRR/Sharpe, benchmarks, accounting mapper, licensing, Marketplace subscriptions, services orchestration, connectors, market data, schema) | **196 passed** |
+| Offline pytest suite (core engine, lots, corporate actions, income, bonds, FX, valuation, TWR/XIRR/Sharpe, benchmarks, accounting mapper, licensing, Marketplace subscriptions, services orchestration, connectors, market data, schema) | **200 passed** |
 | Dashboard JS suite (`node --test tests/js/investing.test.js`) | **21 passed** |
 | Ruff lint (`target-version = py310`) | Passed |
+| Install preflight — hook and patch targets resolve, 19 doctypes carry a valid module/folder/controller class, 176 fields link only to doctypes that exist, dashboard calls only whitelisted API methods, hooked assets present (`scripts/preflight.py`) | Clean |
 | Connector/market-data HTTP error sanitization (secrets never in error strings) | Tested with mocked transports |
 | Frappe Cloud subscription read, cache, grace window and outage fallback | Tested with a stubbed press transport — **no live press calls** |
 | Zerodha/Alpaca/IBKR-Flex/CSV parsing | Fixture tests only — **no live broker calls** |
@@ -14,7 +15,9 @@
 
 ## Not executed here
 
-- A live Frappe/ERPNext site install, migration or browser session.
+- A live Frappe/ERPNext site install, migration or browser session. There is no bench,
+  Docker or MariaDB on the development machine, so `scripts/preflight.py` is the closest
+  local substitute: it proves the tree is *self-consistent*, not that it installs.
 - Any real broker account, market-data key, or production portfolio data.
 - A real Frappe Cloud Marketplace subscription. The plan reader is verified against a stubbed
   transport only; the endpoint shape (`document_name`, `enabled`, `plan`, `site`) comes from
@@ -36,5 +39,6 @@ Run everything from the repo root:
 python -m pytest -q
 ruff check .
 node --test tests/js/investing.test.js
+python scripts/preflight.py
 python -m build && python scripts/check_dist.py
 ```
