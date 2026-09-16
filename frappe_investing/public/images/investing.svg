@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Investing"><rect width="64" height="64" rx="16" fill="#0b6e4f"/><path d="M12 44 26 30l8 8 18-20" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M44 18h8v8" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Investing">
+  <rect width="512" height="512" rx="112" fill="#119362"/>
+  <g fill="#ffffff">
+    <rect x="118" y="298" width="76" height="96" rx="18"/>
+    <rect x="218" y="252" width="76" height="142" rx="18"/>
+    <rect x="318" y="206" width="76" height="188" rx="18"/>
+    <path d="M356 118 L 372 196 L 336 160 L 300 196 L 286 182 L 322 146 L 288 132 Z"/>
+  </g>
+  <path d="M132 262 C 200 236, 268 200, 330 138" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round"/>
+</svg>

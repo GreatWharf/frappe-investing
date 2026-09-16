@@ -1,49 +1,51 @@
-# Frappe Investing
+<div align="center">
+	<a href="https://github.com/GreatWharf/frappe-investing">
+		<img src="docs/images/logo.png" width="128" alt="Investing logo">
+	</a>
+	<h1>Investing</h1>
+	<p><strong>Open source investment management for ERPNext</strong></p>
 
-**Investment management for ERPNext — portfolios, broker sync, corporate actions, performance, and real accounting entries.**
+[![Frappe integration](https://github.com/GreatWharf/frappe-investing/actions/workflows/bench-integration.yml/badge.svg)](https://github.com/GreatWharf/frappe-investing/actions/workflows/bench-integration.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Track stocks, ETFs and bonds with an auditable, event-sourced ledger inside ERPNext. Connect brokers automatically, or import CSV. Every position is derived from immutable investment events, every profit and loss can be traced back to its tax lots, and every accounting entry follows your own accounting policy.
+**[Documentation](docs/architecture.md)** · **[Tiers & Licensing](docs/tiers.md)** · **[Verification](docs/verification.md)**
 
-**The free tier is open source (MIT) and tracks one asset class forever.** Paid tiers raise the asset-class count and can carry a portfolio-value cap — enforced in-app, not just on the price page.
+<img src="docs/images/hero.png" alt="Investing dashboard" width="100%">
 
-> Status: implementation release candidate. Not yet on the Frappe Marketplace; not yet live-validated against a production broker account. See `docs/verification.md`.
+> **Unofficial.** This is a community app, not affiliated with or endorsed by Frappe or ERPNext.
+</div>
 
-## What you can do
+---
 
-- **Portfolios and accounts** — group broker accounts into portfolios per company, in any base currency.
-- **Automatic broker sync** — Zerodha (Kite Connect), Alpaca, Interactive Brokers (Flex Web Service), plus a generic CSV importer.
-- **Every event accounted for** — buys, sells, dividends, bond coupons, fees, deposits, withdrawals, transfers, stock splits, reverse splits, stock dividends, spin-offs, cash-in-lieu, redemptions.
-- **Tax lots your way** — FIFO, LIFO, average cost, or specific identification; realized P&L per allocation.
-- **Corporate actions done right** — a 4-for-1 split keeps your total cost basis exactly; spin-offs allocate basis explicitly; fractional shares sell through cash-in-lieu.
-- **Performance that respects cash flows** — daily snapshots, time-weighted return (TWR), money-weighted XIRR, income totals, currency translation with explicit FX rates.
-- **ERPNext accounting** — an Investment Accounting Policy maps each event type to your chart of accounts; journal entries post as drafts or submitted per policy, idempotently, and cancel with their events.
-- **Fixed income, properly** — coupon schedules, accrued interest (30/360, ACT/ACT), clean/dirty prices, yield-to-maturity, redemption at maturity.
+## Investing
+
+Investing is a comprehensive investment management system for ERPNext. Track stocks, ETFs, bonds, funds and crypto with an auditable, event-sourced ledger. Every position is derived from immutable investment events, every profit and loss traces back to its tax lots, and every accounting entry follows your own accounting policy. Built for finance teams, family offices and businesses that hold investments on their ERPNext books.
+
+## Key Features
+
+- **Portfolios & Accounts**: group broker accounts into portfolios per company, in any base currency, with multi-currency valuation through explicit FX rates.
+- **Automatic Broker Sync**: Zerodha (Kite Connect), Alpaca and Interactive Brokers (Flex Web Service), plus a generic CSV importer for everything else.
+- **Every Event Accounted For**: buys, sells, dividends, bond coupons, fees, deposits, withdrawals, transfers, splits, reverse splits, stock dividends, spin-offs, cash-in-lieu and redemptions.
+- **Tax Lots, Your Way**: FIFO, LIFO, average cost or specific identification, with realized P&L computed per allocation.
+- **Corporate Actions Done Right**: a 4-for-1 split keeps your total cost basis exact; spin-offs allocate basis explicitly; fractional shares settle through cash-in-lieu.
+- **Performance that Respects Cash Flows**: daily snapshots, time-weighted return, money-weighted XIRR, Sharpe ratio, and comparison against popular benchmarks (S&P 500, Nasdaq 100, Nifty 50, Nikkei 225, EURO STOXX 50, KOSPI, SSE).
+- **Real ERPNext Accounting**: an Investment Accounting Policy maps each event type to your chart of accounts; journal entries post idempotently and cancel with their events.
+- **Fixed Income, Properly**: coupon schedules, accrued interest (30/360, ACT/ACT), clean/dirty prices, yield-to-maturity and redemption at maturity.
 
 ## Tiers
 
 | | Free | Pro |
 |---|---|---|
-| Stocks, ETFs, bonds, funds, crypto features | ✓ | ✓ |
-| All broker connectors + CSV | ✓ | ✓ |
-| Corporate actions, lots, performance, accounting | ✓ | ✓ |
+| All asset classes, connectors, corporate actions, accounting | ✓ | ✓ |
 | **Asset classes tracked at once** | **1** | **5** |
 | **Portfolio value cap** | none | per license |
 
-Every tier has every feature; tiers differ only in how many asset classes you track and (optionally) a value cap. Paid tiers activate with an offline-signed license key (Investment License). No feature data leaves your site; verification is local. Open source means this is a commercial control, not DRM — see `docs/tiers.md` for the honest version.
+Every tier has every feature; tiers differ only in how many asset classes you track at once and an optional portfolio-value cap. Paid tiers activate with an offline-signed license key; verification is local and no data leaves your site. Open source means this is a commercial control, not DRM; see [Tiers & Licensing](docs/tiers.md) for the honest version.
 
-## Data sources (zero mandatory cost)
+## Under the Hood
 
-- **Brokers are account truth** — trades, holdings, dividends and withholding come from your broker, with your credentials, on your site.
-- **Prices:** manual entry, Stooq EOD (free, no key), broker quotes, or your own Alpha Vantage key. Crypto prices via CoinGecko (counts toward your license's asset-class limit).
-- **Zerodha honesty:** the Kite API provides holdings, quotes and today's trades — not historical trades or dividends. Those import from Zerodha Console CSV exports. This is documented, not hidden.
-
-## Getting started
-
-1. Install the app on Frappe/ERPNext v15 or v16 (MariaDB).
-2. Assign the **Investment User** or **Investment Manager** role.
-3. Open **Investing** from the workspace, create a portfolio and an investment account.
-4. Add securities manually, or connect a broker in **Broker Setup**.
-5. Configure the **Investment Accounting Policy** for your company to post events to the ledger.
+1. **[ERPNext](https://github.com/frappe/erpnext)**: the open source ERP your investment accounting posts into.
+2. **[Frappe Framework](https://github.com/frappe/frappe)**: a full-stack web application framework written in Python and JavaScript.
 
 ## Documentation
 
@@ -55,10 +57,16 @@ Every tier has every feature; tiers differ only in how many asset classes you tr
 - [Operations and upgrades](docs/operations.md)
 - [Verification record](docs/verification.md)
 
-## Not affiliated
+## Contributing
 
-Not affiliated with Zerodha, Alpaca, Interactive Brokers, Frappe or any market-data provider. Broker and exchange names belong to their owners. Nothing here is investment advice.
+1. [Issue Guidelines](https://github.com/frappe/erpnext/wiki/Issue-Guidelines)
+2. [Report Security Vulnerabilities](https://erpnext.com/security)
+3. [Pull Request Requirements](https://github.com/frappe/erpnext/wiki/Contribution-Guidelines)
 
 ## License
 
-MIT — see LICENSE.
+MIT; see [LICENSE](LICENSE). Not affiliated with Zerodha, Alpaca, Interactive Brokers, Frappe or any market-data provider; broker and exchange names belong to their owners. Nothing here is investment advice.
+
+<div align="center">
+	<img src="docs/images/logo.png" width="48" alt="Investing">
+</div>

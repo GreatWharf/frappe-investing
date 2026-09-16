@@ -24,7 +24,7 @@ test = ["pytest>=8.4,<10", "ruff>=0.14", "build>=1,<2", "tomli>=2,<3; python_ver
 include = ["frappe_investing*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.js", "*.css", "*.txt", "*.svg", "*.html", "*.csv"]
+"*" = ["*.json", "*.js", "*.css", "*.txt", "*.svg", "*.html", "*.csv", "*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

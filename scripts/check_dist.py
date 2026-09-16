@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "frappe_investing"
-SUFFIXES = {".py", ".json", ".js", ".css", ".txt", ".svg", ".html", ".csv"}
+SUFFIXES = {".py", ".json", ".js", ".css", ".txt", ".svg", ".html", ".csv", ".png"}
 
 
 def main():
