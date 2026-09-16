@@ -279,6 +279,61 @@ test("license dialog is gated to managers", async () => {
 	assert.equal(save[0].args.license_key, "FINV1.payload.sig");
 });
 
+test("a Frappe Cloud plan shows its own name and needs no license key", async () => {
+	const data = dashboardFixture();
+	data.license = {
+		tier: "pro", status: "active", source: "cloud", customer: "acme.frappe.cloud",
+		expires: "", max_asset_classes: 5, max_value: null, value_currency: null,
+		cloud_managed: true, cloud_plan: "Pro", cloud_site: "acme.frappe.cloud", cloud_note: "",
+	};
+	const desk = deskWithDashboard({
+		dashboard: data,
+		extra: { "frappe_investing.api.refresh_license": () => ({ message: data.license }) },
+	});
+	await loadDashboardPage(desk);
+	assert.ok(
+		desk.texts().some((t) => /From your Frappe Cloud plan Pro/.test(t)),
+		"the card names the plan the tier came from",
+	);
+	assert.ok(desk.texts().some((t) => /Covers 5 asset class/.test(t)), "limits are spelled out");
+	assert.ok(
+		!desk.texts().some((t) => /Licensed to/.test(t)),
+		"a Cloud site is never described as key-licensed",
+	);
+
+	const refresh = desk.button("Refresh Plan");
+	assert.ok(refresh, "a Cloud site can re-read its plan on demand");
+	refresh.click();
+	await desk.flush();
+	assert.equal(desk.callsTo("refresh_license").length, 1);
+});
+
+test("an unrecognised Cloud plan is reported rather than silently ignored", async () => {
+	const data = dashboardFixture();
+	data.license = {
+		tier: "standard", status: "none", source: "none", customer: "", expires: "",
+		max_asset_classes: 1, max_value: null, value_currency: null,
+		cloud_managed: true, cloud_plan: "",
+		cloud_site: "acme.frappe.cloud",
+		cloud_note: "Frappe Cloud plan 'Enterprise' is not one this version knows; update the app.",
+	};
+	const desk = deskWithDashboard({ dashboard: data });
+	await loadDashboardPage(desk);
+	assert.ok(desk.texts().some((t) => /'Enterprise' is not one this version knows/.test(t)));
+	assert.ok(
+		desk.texts().some((t) => /Choose a paid plan in Frappe Cloud/.test(t)),
+		"a Cloud site is pointed at its dashboard, not at a license key",
+	);
+});
+
+test("a self-hosted site is offered a key and no plan refresh", async () => {
+	const desk = deskWithDashboard();
+	await loadDashboardPage(desk);
+	assert.equal(desk.button("Refresh Plan"), null, "no plan to refresh without a subscription");
+	assert.ok(desk.button("Enter License Key"), "the key is the self-hosted path");
+	assert.ok(desk.texts().some((t) => /Enter a license key to track more asset classes/.test(t)));
+});
+
 test("event dialog adapts visible fields to the event type", async () => {
 	const desk = deskWithDashboard();
 	await loadDashboardPage(desk);

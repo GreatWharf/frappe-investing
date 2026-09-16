@@ -1,11 +1,13 @@
 """Offline orchestration tests: fake Frappe store, real engine/services logic."""
 
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal as D
 from types import ModuleType, SimpleNamespace
 
 import pytest
+
+NOW = datetime(2026, 9, 16, 12, 0, 0)
 
 
 class Row(dict):
@@ -237,9 +239,11 @@ def services(monkeypatch):
             return Lock()
 
     fake.cache = Cache()
+    fake.conf = {}
     utils = ModuleType("frappe.utils")
     utils.today = lambda: "2026-09-16"
-    utils.now_datetime = lambda: "2026-09-16 12:00:00"
+    utils.now_datetime = lambda: NOW
+    utils.get_datetime = lambda v: v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
     utils.add_days = lambda d, n: d
     utils.cint = int
     monkeypatch.setitem(sys.modules, "frappe", fake)
@@ -597,6 +601,107 @@ def test_public_state_exposes_limits(services):
     assert public["max_value"] == "250000"
     assert public["value_currency"] == "USD"
     assert public["status"] == "active"
+
+
+def _cloud_mod(services, *, plan="", checked=None, secret="sk-test-secret"):
+    """license_service with a Cloud subscription cache, and the real evaluate()."""
+    import frappe_investing.license_service as license_mod
+
+    _, fake, store = services
+    if secret:
+        fake.conf["sk_frappe_investing"] = secret
+    store["Investment License"].update(cloud_plan=plan, cloud_checked_at=checked)
+    return license_mod
+
+
+def _press_returns(monkeypatch, **info):
+    from frappe_investing import marketplace
+
+    monkeypatch.setattr(marketplace, "fetch_subscription", lambda secret, **kw: info)
+
+
+def test_a_cloud_plan_sets_the_tier_with_no_license_key(services):
+    license_mod = _cloud_mod(services, plan="Pro", checked=NOW)
+    state = license_mod.current_state()
+    assert state.tier == "pro"
+    assert state.source == "cloud"
+    assert state.max_asset_classes == 5
+    assert services[2]["Investment License"].license_key == ""
+
+
+def test_a_cloud_plan_survives_an_outage_inside_the_grace_window(services):
+    license_mod = _cloud_mod(services, plan="Pro", checked=NOW - timedelta(days=6))
+    assert license_mod.current_state().tier == "pro"
+
+
+def test_a_cloud_plan_stops_counting_once_the_grace_window_lapses(services):
+    license_mod = _cloud_mod(services, plan="Pro", checked=NOW - timedelta(days=8))
+    state = license_mod.current_state()
+    assert state.tier == "standard"
+    assert state.max_asset_classes == 1
+
+
+def test_resolving_a_tier_never_calls_frappe_cloud(services, monkeypatch):
+    from frappe_investing import marketplace
+
+    def explode(*args, **kw):
+        raise AssertionError("enforcement must not block on the network")
+
+    monkeypatch.setattr(marketplace, "fetch_subscription", explode)
+    license_mod = _cloud_mod(services, plan="Pro", checked=NOW)
+    license_mod.require_asset_class("Bond")  # no exception, no request
+
+
+def test_refresh_stores_the_plan_press_reports(services, monkeypatch):
+    license_mod = _cloud_mod(services)
+    _press_returns(monkeypatch, plan="Pro", site="acme.frappe.cloud", enabled=True, document_name="x")
+    public = license_mod.refresh_cloud_subscription()
+    assert public["tier"] == "pro"
+    assert public["source"] == "cloud"
+    assert public["cloud_plan"] == "Pro"
+    assert public["cloud_site"] == "acme.frappe.cloud"
+    assert services[2]["Investment License"].cloud_checked_at == NOW
+
+
+def test_refresh_clears_the_plan_when_the_subscription_is_disabled(services, monkeypatch):
+    license_mod = _cloud_mod(services, plan="Pro", checked=NOW)
+    _press_returns(monkeypatch, plan="Pro", site="acme.frappe.cloud", enabled=False)
+    public = license_mod.refresh_cloud_subscription()
+    assert public["cloud_plan"] == ""
+    assert public["tier"] == "standard"
+    assert "not active" in public["cloud_note"]
+
+
+def test_refresh_names_a_plan_this_build_does_not_know(services, monkeypatch):
+    license_mod = _cloud_mod(services)
+    _press_returns(monkeypatch, plan="Enterprise", site="acme.frappe.cloud", enabled=True)
+    public = license_mod.refresh_cloud_subscription()
+    assert public["tier"] == "standard"
+    assert "Enterprise" in public["cloud_note"]
+
+
+def test_a_failed_refresh_keeps_the_cached_plan_and_its_timestamp(services, monkeypatch):
+    from frappe_investing import marketplace
+
+    stale = NOW - timedelta(days=2)
+    license_mod = _cloud_mod(services, plan="Pro", checked=stale)
+
+    def unreachable(secret, **kw):
+        raise marketplace.SubscriptionUnavailable("Could not reach Frappe Cloud: timed out")
+
+    monkeypatch.setattr(marketplace, "fetch_subscription", unreachable)
+    public = license_mod.refresh_cloud_subscription()
+    assert public["tier"] == "pro"
+    assert services[2]["Investment License"].cloud_checked_at == stale
+    assert "Could not reach" in public["cloud_note"]
+
+
+def test_refresh_on_a_self_hosted_site_says_it_is_not_on_frappe_cloud(services):
+    license_mod = _cloud_mod(services, secret=None)
+    public = license_mod.refresh_cloud_subscription()
+    assert public["cloud_managed"] is False
+    assert public["tier"] == "standard"
+    assert "not a Frappe Cloud" in public["cloud_note"]
 
 
 def test_portfolio_value_check_same_currency_breach(services):

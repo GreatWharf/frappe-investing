@@ -1,5 +1,10 @@
 """Offline license verification for paid tiers.
 
+This is the fallback tier source, for sites that are not on Frappe Cloud. A
+Marketplace install reads its plan straight from the subscription instead; see
+marketplace.py. Both produce a LicenseState, and `most_generous` picks between
+them so neither path can demote the other.
+
 License format: FINV1.<base64url(payload)>.<base64url(ed25519 signature)>
 Payload is canonical JSON; the signature covers exactly those bytes.
 Open source note: this is a commercial control, not DRM — anyone can edit the source.
@@ -12,8 +17,10 @@ unlimited. The free tier is 1 asset class with no value cap.
 import base64
 import binascii
 import json
+import math
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -41,10 +48,39 @@ class LicenseState:
     max_asset_classes: int | None = 1
     max_value: str | None = None  # decimal string; None = no cap
     value_currency: str | None = None  # reference currency for max_value
+    source: str = "none"  # none | key | cloud
 
     @property
     def active(self):
         return self.status == "active"
+
+
+def tier_limits(tier):
+    """Built-in (max_asset_classes, max_value, value_currency) for a named tier."""
+    return _TIER_LIMITS[tier]
+
+
+def _generosity(state):
+    """Sort key ranking how much a state grants; anything inactive ranks lowest."""
+    if state is None or state.status != "active":
+        return (0, 0, 0)
+    classes = math.inf if state.max_asset_classes is None else state.max_asset_classes
+    value = math.inf if state.max_value is None else float(state.max_value)
+    return (1, classes, value)
+
+
+def most_generous(*states):
+    """The state granting the most, so neither tier source can demote the other.
+
+    A Cloud subscriber whose plan lapses keeps a paid key's limits, and a
+    customer on a big Cloud plan is not held back by an older key. Ties go to
+    the first argument, which is why callers pass the Cloud state first: it is
+    the one that refreshes itself.
+    """
+    candidates = [state for state in states if state is not None]
+    if not candidates:
+        return LicenseState(status="none", tier="standard")
+    return max(candidates, key=_generosity)
 
 
 def _b64decode(text):
@@ -73,8 +109,13 @@ def _limits_for(tier, payload):
     currency = payload.get("value_currency", default_currency)
     if classes is not None and (not isinstance(classes, int) or classes < 1):
         raise ValueError("max_asset_classes must be a positive integer or null")
-    if value is not None and not currency:
-        raise ValueError("a value cap requires a value_currency")
+    if value is not None:
+        if not currency:
+            raise ValueError("a value cap requires a value_currency")
+        try:
+            Decimal(str(value))
+        except InvalidOperation as exc:
+            raise ValueError("max_value must be a decimal string") from exc
     return classes, value, currency
 
 
@@ -96,7 +137,7 @@ def evaluate(license_key, *, on=None):
         classes, value, currency = _limits_for(payload["tier"], payload)
         expires = date.fromisoformat(payload["expires"])
     except (ValueError, TypeError, InvalidSignature, json.JSONDecodeError, binascii.Error):
-        return LicenseState(status="invalid", tier="standard")
+        return LicenseState(status="invalid", tier="standard", source="key")
     if expires < on:
         # Expired licenses fall back to the free tier's limits, not the paid ones.
         classes, value, currency = _TIER_LIMITS["standard"]
@@ -108,6 +149,7 @@ def evaluate(license_key, *, on=None):
             max_asset_classes=classes,
             max_value=value,
             value_currency=currency,
+            source="key",
         )
     return LicenseState(
         status="active",
@@ -117,4 +159,5 @@ def evaluate(license_key, *, on=None):
         max_asset_classes=classes,
         max_value=value,
         value_currency=currency,
+        source="key",
     )

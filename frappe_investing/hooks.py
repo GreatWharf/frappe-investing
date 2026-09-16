@@ -29,7 +29,11 @@ before_uninstall = "frappe_investing.install.before_uninstall"
 
 scheduler_events = {
     "cron": {"*/15 * * * *": ["frappe_investing.sync_service.scheduled_broker_sync"]},
-    "daily": ["frappe_investing.services.daily_snapshots", "frappe_investing.license_service.check_expiry"],
+    "daily": [
+        "frappe_investing.services.daily_snapshots",
+        "frappe_investing.license_service.check_expiry",
+        "frappe_investing.license_service.refresh_cloud_subscription",
+    ],
 }
 
 permission_query_conditions = {

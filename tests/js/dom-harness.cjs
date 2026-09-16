@@ -63,8 +63,10 @@ class Element {
 	}
 
 	trigger(event, arg) {
+		// currentTarget/target are what handlers use to disable the button they
+		// were fired from, so the harness has to supply them like jQuery does.
 		for (const handler of this.handlers[event] || []) {
-			handler.call(this, { preventDefault() {}, type: event }, arg);
+			handler.call(this, { preventDefault() {}, type: event, currentTarget: this, target: this }, arg);
 		}
 	}
 

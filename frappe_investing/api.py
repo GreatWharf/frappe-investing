@@ -193,6 +193,13 @@ def save_license(license_key):
     return license_service.save_license(license_key or "")
 
 
+@frappe.whitelist(methods=["POST"])
+def refresh_license():
+    """Re-read the Frappe Cloud plan now, rather than waiting for the daily job."""
+    _manager()
+    return license_service.refresh_cloud_subscription()
+
+
 @frappe.whitelist()
 def license_status():
     _user()

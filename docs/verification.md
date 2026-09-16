@@ -1,20 +1,25 @@
-# Verification record — 2026-09-16
+# Verification record — 2026-09-17
 
 ## Executed locally
 
 | Check | Result |
 |---|---|
-| Offline pytest suite (core engine, lots, corporate actions, income, bonds, FX, valuation, TWR/XIRR, accounting mapper, licensing, services orchestration, connectors, market data, schema) | **128 passed** |
-| Ruff lint | Passed |
-| Python 3.10 grammar check (all app/test/script files) | Passed |
+| Offline pytest suite (core engine, lots, corporate actions, income, bonds, FX, valuation, TWR/XIRR/Sharpe, benchmarks, accounting mapper, licensing, Marketplace subscriptions, services orchestration, connectors, market data, schema) | **196 passed** |
+| Dashboard JS suite (`node --test tests/js/investing.test.js`) | **21 passed** |
+| Ruff lint (`target-version = py310`) | Passed |
 | Connector/market-data HTTP error sanitization (secrets never in error strings) | Tested with mocked transports |
+| Frappe Cloud subscription read, cache, grace window and outage fallback | Tested with a stubbed press transport — **no live press calls** |
 | Zerodha/Alpaca/IBKR-Flex/CSV parsing | Fixture tests only — **no live broker calls** |
-| Distribution wheel + source archive contents | Checked by `scripts/check_dist.py` |
+| Distribution wheel + source archive contents (109 runtime files) | Checked by `scripts/check_dist.py` |
 
 ## Not executed here
 
 - A live Frappe/ERPNext site install, migration or browser session.
 - Any real broker account, market-data key, or production portfolio data.
+- A real Frappe Cloud Marketplace subscription. The plan reader is verified against a stubbed
+  transport only; the endpoint shape (`document_name`, `enabled`, `plan`, `site`) comes from
+  reading `press/api/developer/marketplace.py`, and press does not publish it as a stable
+  contract. Confirm it against a live subscription before the first paid customer.
 - The bench integration workflow (`frappe_investing.tests.test_integration`) — it exists for CI; run it before treating a release as production-proven.
 - License key generation for production (the embedded public key is a development placeholder until the publisher generates the real keypair with `scripts/make_license.py`).
 

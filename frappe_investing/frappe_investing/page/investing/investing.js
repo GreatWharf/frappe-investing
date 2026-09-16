@@ -1,8 +1,8 @@
 /* Frappe Investing — portfolio dashboard (page route: investing).
  *
  * Consumes the frozen API in frappe_investing/api.py (get_dashboard,
- * create_portfolio, record_manual_event, save_license, sync_now,
- * refresh_prices). All rendering goes through jQuery .text() so dynamic
+ * create_portfolio, record_manual_event, save_license, refresh_license,
+ * sync_now, refresh_prices). All rendering goes through jQuery .text() so dynamic
  * strings are never injected as HTML; signed values are colour-coded purely
  * through CSS classes.
  */
@@ -752,7 +752,11 @@
 			if (license.status === "none" || !license.status) {
 				tier.text(__("Free tier"));
 				$('<div class="inv-license-meta">')
-					.text(__("One asset class, free forever. Enter a license key to track more asset classes or lift a portfolio-value cap."))
+					.text(
+						license.cloud_managed
+							? __("One asset class, free forever. Choose a paid plan in Frappe Cloud and it applies here automatically.")
+							: __("One asset class, free forever. Enter a license key to track more asset classes or lift a portfolio-value cap.")
+					)
 					.appendTo(section);
 			} else if (license.status === "active") {
 				tier.text(license.tier === "pro" ? __("Pro") : __("Standard"));
@@ -762,12 +766,14 @@
 				const cap = license.max_value
 					? ` ${__("Value capped at {0} {1}.", [String(license.max_value), license.value_currency || ""])}`
 					: "";
+				const origin = license.source === "cloud"
+					? __("From your Frappe Cloud plan {0}.", [license.cloud_plan || license.tier])
+					: __("Licensed to {0}.", [license.customer || __("Unknown customer")]);
+				const renews = license.source !== "cloud" && license.expires
+					? ` ${__("Renews or expires on {0}.", [inv.formatDate(license.expires)])}`
+					: "";
 				$('<div class="inv-license-meta">')
-					.text(
-						__("Licensed to {0}.", [license.customer || __("Unknown customer")]) +
-							` ${__("Covers {0}.", [limits])}` + cap +
-							(license.expires ? ` ${__("Renews or expires on {0}.", [inv.formatDate(license.expires)])}` : "")
-					)
+					.text(origin + ` ${__("Covers {0}.", [limits])}` + cap + renews)
 					.appendTo(section);
 			} else if (license.status === "expired") {
 				tier.text(__("Free tier"));
@@ -780,8 +786,26 @@
 					.text(__("The stored license key is invalid. Enter a valid key to enable your tier."))
 					.appendTo(section);
 			}
+			if (license.cloud_managed && license.source !== "cloud" && license.cloud_note) {
+				$('<div class="inv-license-meta">').text(license.cloud_note).appendTo(section);
+			}
 			if (inv.isManager()) {
 				const actions = $('<div class="inv-license-actions">').appendTo(section);
+				if (license.cloud_managed) {
+					$('<button type="button" class="btn btn-default">')
+						.text(__("Refresh Plan"))
+						.on("click", async (event) => {
+							const button = $(event.currentTarget).prop("disabled", true);
+							try {
+								await call("refresh_license");
+								frappe.show_alert({ message: __("Plan refreshed from Frappe Cloud."), indicator: "green" });
+								load();
+							} finally {
+								button.prop("disabled", false);
+							}
+						})
+						.appendTo(actions);
+				}
 				$('<button type="button" class="btn btn-default">')
 					.text(__("Enter License Key"))
 					.on("click", () => showLicenseDialog())
@@ -831,7 +855,7 @@
 				title: __("Enter License Key"),
 				fields: [
 					{ fieldname: "license_key", label: __("License Key"), fieldtype: "Small Text", reqd: 0,
-						description: __("Paste the FINV1.… key you received. It is verified offline; clearing the field returns to the free Standard tier.") },
+						description: __("For sites outside Frappe Cloud. Paste the FINV1.… key you received; it is verified offline, and clearing the field returns to the free Standard tier. On Frappe Cloud your plan applies on its own and no key is needed.") },
 				],
 				primary_action_label: __("Save"),
 				primary_action: async (values) => {

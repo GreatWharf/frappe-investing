@@ -20,6 +20,37 @@
       "read_only": 1
     },
     {
+      "fieldname": "source",
+      "label": "Tier Source",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "description": "cloud (Frappe Cloud subscription), key (license key), or none"
+    },
+    {
+      "fieldname": "cloud_plan",
+      "label": "Frappe Cloud Plan",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "cloud_site",
+      "label": "Frappe Cloud Site",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "cloud_checked_at",
+      "label": "Plan Last Read",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "cloud_note",
+      "label": "Subscription Note",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
       "fieldname": "status",
       "label": "Status",
       "fieldtype": "Data",
@@ -57,14 +88,19 @@
     }
   ],
   "field_order": [
-    "license_key",
     "tier",
     "status",
+    "source",
+    "limits",
+    "status_note",
+    "cloud_plan",
+    "cloud_site",
+    "cloud_checked_at",
+    "cloud_note",
+    "license_key",
     "customer",
     "expires",
-    "limits",
-    "validated_at",
-    "status_note"
+    "validated_at"
   ],
   "permissions": [
     {

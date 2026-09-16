@@ -23,7 +23,7 @@ On Frappe Cloud, add the app from the Marketplace once listed; installation and 
 ## Scheduled jobs
 
 - Broker sync: every 15 minutes, enabled connections only, one per connection at a time (lock + job dedupe).
-- Daily: portfolio snapshots, license expiry check.
+- Daily: portfolio snapshots, license expiry check, Frappe Cloud plan refresh.
 
 ## Backups and data
 
