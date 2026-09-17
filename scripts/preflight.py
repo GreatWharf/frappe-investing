@@ -157,6 +157,10 @@ def check_doctypes(doctypes, symbols):
         where = f"doctype/{folder.name}"
         if data.get("module") not in modules:
             fail(where, f"module {data.get('module')!r} is not in modules.txt")
+        # frappe builds controller paths as {app}.{scrub(module)}.doctype.X.x — so the
+        # module dir must be named after the scrubbed Module Def, not the app.
+        if snake(data.get("module") or "") != MODULE.name:
+            fail(where, f"module {data.get('module')!r} scrubs to {snake(data.get('module') or '')!r}, but the dir is {MODULE.name!r}")
         if snake(name) != folder.name:
             fail(where, f"folder should be {snake(name)} for doctype {name!r}")
 
