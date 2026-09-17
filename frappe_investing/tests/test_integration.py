@@ -134,16 +134,22 @@ class TestInvestingIntegration(IntegrationTestCase):
         second, c2 = record_event(dict(data))
         self.assertEqual(first, second)
         self.assertFalse(c2)
-        frappe.get_doc(
-            {
-                "doctype": "Security Price",
-                "security": self.security.name,
-                "date": "2026-02-01",
-                "close": "12.5",
-                "currency": "USD",
-                "source": "Manual",
-            }
-        ).insert()
+        # Security Price is engine-managed; the test writes one the way the
+        # engine does — behind the investing_internal flag.
+        frappe.flags.investing_internal = True
+        try:
+            frappe.get_doc(
+                {
+                    "doctype": "Security Price",
+                    "security": self.security.name,
+                    "date": "2026-02-01",
+                    "close": "12.5",
+                    "currency": "USD",
+                    "source": "Manual",
+                }
+            ).insert()
+        finally:
+            frappe.flags.investing_internal = False
         result = value_portfolio(self.portfolio.name, day="2026-02-01")
         self.assertEqual(float(result["total_value"]), 125.0)
 
