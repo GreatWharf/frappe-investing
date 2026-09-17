@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "frappe_investing"
-MODULE = APP / "frappe_investing"
+MODULE = APP / "investing"
 
 # Doctypes this app links to but does not own. Anything outside this list that is not
 # defined here is almost certainly a typo.

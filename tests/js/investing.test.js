@@ -14,9 +14,9 @@ const test = require("node:test");
 const { createDesk, Wrap } = require("./dom-harness.cjs");
 
 const NAMESPACE_JS = "frappe_investing/public/js/investing.js";
-const PAGE_JS = "frappe_investing/frappe_investing/page/investing/investing.js";
-const SETUP_JS = "frappe_investing/frappe_investing/page/broker_setup/broker_setup.js";
-const FORM_JS = "frappe_investing/frappe_investing/doctype/broker_connection/broker_connection.js";
+const PAGE_JS = "frappe_investing/investing/page/investing/investing.js";
+const SETUP_JS = "frappe_investing/investing/page/broker_setup/broker_setup.js";
+const FORM_JS = "frappe_investing/investing/doctype/broker_connection/broker_connection.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "frappe_investing"
-SCHEMA_DIR = APP / "frappe_investing" / "doctype"
+SCHEMA_DIR = APP / "investing" / "doctype"
 
 try:
     import tomllib
