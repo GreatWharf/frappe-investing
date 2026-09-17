@@ -87,4 +87,14 @@ jobs:
           fi
       - name: Test actual ERPNext investment ledger lifecycle
         working-directory: ${{ runner.temp }}/invest-bench
-        run: bench --site test.localhost run-tests --app frappe_investing --module frappe_investing.tests.test_integration
+        run: |
+          bench --site test.localhost run-tests --app frappe_investing --module frappe_investing.tests.test_integration 2>&1 | tee /tmp/test-step.log || status=$?
+          status=${status:-0}
+          if [ "$status" -ne 0 ]; then
+            tail -n 40 /tmp/test-step.log | while IFS= read -r line; do
+              line="${line//%/%25}"
+              line="${line//$'\r'/}"
+              printf '::error::%s\n' "$line"
+            done
+            exit "$status"
+          fi
