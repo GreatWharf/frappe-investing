@@ -59,18 +59,32 @@ jobs:
         env:
           FRAPPE_BRANCH: ${{ matrix.frappe }}
         run: |
-          bench init --frappe-branch "$FRAPPE_BRANCH" --skip-redis-config-generation --skip-assets invest-bench
-          cd invest-bench
-          bench set-config -g redis_cache redis://127.0.0.1:13000
-          bench set-config -g redis_queue redis://127.0.0.1:11000
-          bench set-config -g redis_socketio redis://127.0.0.1:11000
-          bench get-app --branch "$FRAPPE_BRANCH" https://github.com/frappe/erpnext
-          bench get-app "$GITHUB_WORKSPACE"
-          bench new-site test.localhost --db-host 127.0.0.1 --db-root-username root --db-root-password test-root --admin-password test-admin
-          bench --site test.localhost install-app erpnext
-          bench --site test.localhost install-app frappe_investing
-          bench --site test.localhost set-config allow_tests true
-          bench --site test.localhost migrate
+          {
+            bench init --frappe-branch "$FRAPPE_BRANCH" --skip-redis-config-generation --skip-assets invest-bench
+            cd invest-bench
+            bench set-config -g redis_cache redis://127.0.0.1:13000
+            bench set-config -g redis_queue redis://127.0.0.1:11000
+            bench set-config -g redis_socketio redis://127.0.0.1:11000
+            bench get-app --branch "$FRAPPE_BRANCH" https://github.com/frappe/erpnext
+            bench get-app "$GITHUB_WORKSPACE"
+            bench new-site test.localhost --db-host 127.0.0.1 --db-root-username root --db-root-password test-root --admin-password test-admin
+            bench --site test.localhost install-app erpnext
+            bench --site test.localhost install-app frappe_investing
+            bench --site test.localhost set-config allow_tests true
+            bench --site test.localhost migrate
+          } 2>&1 | tee /tmp/bench-step.log || status=$?
+          status=${status:-0}
+          if [ "$status" -ne 0 ]; then
+            # The run-log API needs auth; check-run annotations do not. Mirror
+            # the failure tail as error annotations so the cause is readable
+            # from the check-run without opening the logs.
+            tail -n 40 /tmp/bench-step.log | while IFS= read -r line; do
+              line="${line//%/%25}"
+              line="${line//$'\r'/}"
+              printf '::error::%s\n' "$line"
+            done
+            exit "$status"
+          fi
       - name: Test actual ERPNext investment ledger lifecycle
         working-directory: ${{ runner.temp }}/invest-bench
         run: bench --site test.localhost run-tests --app frappe_investing --module frappe_investing.tests.test_integration
