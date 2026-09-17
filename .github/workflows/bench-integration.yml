@@ -51,7 +51,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mariadb-client libmariadb-dev pkg-config libcups2-dev
           npm install -g yarn
-          python -m pip install frappe-bench
+          # bench >= 5.31 shells out to `uv` to build the bench venv, and the
+          # ubuntu-24.04 runner image does not ship it — install it explicitly.
+          python -m pip install frappe-bench uv
       - name: Initialize isolated bench
         working-directory: ${{ runner.temp }}
         env:
