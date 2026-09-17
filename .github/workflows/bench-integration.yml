@@ -90,15 +90,15 @@ jobs:
         run: |
           bench --site test.localhost run-tests --app frappe_investing --module frappe_investing.tests.test_integration 2>&1 | tee /tmp/test-step.log || status=$?
           status=${status:-0}
-          # unittest's summary is the proof the tests really ran; an empty suite
-          # exits 0 too, so surface it on the check-run either way.
+          # bench can swallow run-tests' failure exit, so the unittest summary
+          # is the verdict: anything but "OK" with all 4 tests is a failure.
           summary=$(grep -E "^(Ran [0-9]+ tests|OK|FAILED)" /tmp/test-step.log | tr '\n' ' ')
           printf '::notice::%s\n' "${summary:-no unittest summary found in test output}"
-          if [ "$status" -ne 0 ]; then
+          if [ "$status" -ne 0 ] || ! echo "$summary" | grep -q "Ran 4 tests.*OK"; then
             tail -n 40 /tmp/test-step.log | while IFS= read -r line; do
               line="${line//%/%25}"
               line="${line//$'\r'/}"
               printf '::error::%s\n' "$line"
             done
-            exit "$status"
+            exit 1
           fi
