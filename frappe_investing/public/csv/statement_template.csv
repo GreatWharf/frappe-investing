@@ -1,0 +1,2 @@
+date,type,security_key,qty,price,amount,gross,fees,taxes,withholding,currency,accrued_interest,split_ratio,basis_allocation,child_security,child_ratio,lot_ids,target_currency,target_amount,notes,source_ref
+2026-01-15,Buy,US:AAPL,10,190.25,,,1.00,,,USD,,,,,,,,,first buy,ORD-1

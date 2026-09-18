@@ -2,7 +2,7 @@
 
 import frappe
 
-from . import license_service, services, sync_service
+from . import importer, license_service, services, sync_service
 
 
 def _user():
@@ -82,6 +82,13 @@ def get_dashboard(portfolio=None, risk_free_rate=0):
         limit_page_length=15,
         order_by="posting_date desc",
     )
+    accounts = frappe.get_all(
+        "Investment Account",
+        filters={"enabled": 1},
+        fields=["name", "account_name", "portfolio", "currency"],
+        limit_page_length=200,
+        order_by="account_name asc",
+    )
     return {
         "needs_setup": False,
         "portfolio": portfolio,
@@ -91,6 +98,7 @@ def get_dashboard(portfolio=None, risk_free_rate=0):
         "connections": connections,
         "pending_accounting": pending,
         "recent_events": recent,
+        "accounts": accounts,
         "license": license_service.public_state(),
         "usage": {
             "asset_classes_used": license_service.used_asset_classes(),
@@ -122,12 +130,51 @@ def create_portfolio(portfolio_name, company, base_currency=None):
     return {"name": doc.name}
 
 
+# Fields a Desk caller may set on a manual event. Everything else —
+# journal_entry, accounting_status, connection, reversal_of, dedupe_key,
+# meta_json — is engine-owned: accepting them from the client would let a
+# caller forge accounting links, skip dedupe, or attach events to another
+# source's sync connection.
+_MANUAL_EVENT_FIELDS = frozenset(
+    {
+        "event_type",
+        "posting_date",
+        "account",
+        "security",
+        "qty",
+        "price",
+        "amount",
+        "gross",
+        "fees",
+        "taxes",
+        "accrued_interest",
+        "currency",
+        "split_ratio",
+        "basis_allocation",
+        "child_ratio",
+        "child_security",
+        "target_currency",
+        "target_amount",
+        "lot_ids",
+        "source_ref",
+        "target_account",
+        "notes",
+    }
+)
+
+
 @frappe.whitelist(methods=["POST"])
 def record_manual_event(**data):
     _user()
-    account = frappe.get_doc("Investment Account", data.get("account"))
+    allowed = {key: data[key] for key in _MANUAL_EVENT_FIELDS if key in data}
+    account = frappe.get_doc("Investment Account", allowed.get("account"))
     account.check_permission("write")
-    name, created = services.record_event(dict(data, source="Manual"))
+    # The account's company must match the caller's readable companies: a
+    # write check on the account alone does not stop posting into another
+    # company's portfolio through a shared account name.
+    company = frappe.db.get_value("Portfolio", account.portfolio, "company")
+    frappe.get_doc("Company", company).check_permission("read")
+    name, created = services.record_event(dict(allowed, source="Manual"))
     return {"name": name, "created": created}
 
 
@@ -236,13 +283,17 @@ def zerodha_exchange_token(connection, request_token):
 @frappe.whitelist(methods=["POST"])
 def sync_now(connection):
     _manager()
-    frappe.enqueue(
+    # frappe.enqueue returns None when deduplicate drops the job (already
+    # queued/running) — report that honestly instead of a false queued: True.
+    queued = frappe.enqueue(
         "frappe_investing.sync_service.sync_connection",
         name=connection,
         queue="long",
         job_id=f"investing-sync-{connection}",
         deduplicate=True,
     )
+    if queued is None:
+        return {"queued": False, "note": "A sync for this connection is already queued or running."}
     return {"queued": True}
 
 
@@ -252,7 +303,182 @@ def refresh_prices(provider=None):
     return sync_service.refresh_prices(provider)
 
 
+# ---------------------------------------------------------------- statement CSV import
+@frappe.whitelist()
+def import_template_url():
+    """Download URL for the statement CSV template (headers + one example row)."""
+    _user()
+    return {"url": "/assets/frappe_investing/csv/statement_template.csv"}
+
+
+@frappe.whitelist()
+def import_reference():
+    """Every supported event type with the columns each one requires.
+
+    Powers the import dialog's reference tab; the required lists mirror
+    core/events.py validate() so the docs and the validator cannot drift.
+    """
+    _user()
+    return {"event_types": importer.OPERATIONS_REFERENCE}
+
+
+@frappe.whitelist()
+def import_cost_method(account):
+    """Capital-gains cost-method backing for the import flow's selector."""
+    _user()
+    doc = frappe.get_doc("Investment Account", account)
+    doc.check_permission("read")
+    return importer.cost_method_info(account)
+
+
+@frappe.whitelist(methods=["POST"])
+def import_preview(account, csv_text, mapping=None):
+    """Parse + validate only. Persists per-row errors as Import Error rows."""
+    _user()
+    account_doc = frappe.get_doc("Investment Account", account)
+    account_doc.check_permission("write")
+    import json
+
+    mapping = json.loads(mapping) if isinstance(mapping, str) else (mapping or None)
+    preview = importer.preview_import(csv_text, account=account, mapping=mapping)
+    batch = _record_import_batch(
+        account, preview["total_rows"], preview["valid_rows"], len(preview["errors"]),
+        preview["errors"], status="Draft",
+    )
+    preview["batch"] = batch
+    return preview
+
+
+@frappe.whitelist(methods=["POST"])
+def import_post(account, csv_text, mapping=None):
+    """Post a validated CSV through services.record_event (dedupe applies).
+
+    Refuses to post while any row has an error — never a partial commit.
+    """
+    _user()
+    account_doc = frappe.get_doc("Investment Account", account)
+    account_doc.check_permission("write")
+    import json
+
+    mapping = json.loads(mapping) if isinstance(mapping, str) else (mapping or None)
+    try:
+        result = importer.post_import(csv_text, account=account, mapping=mapping)
+    except importer.ImportError as exc:
+        preview = importer.preview_import(csv_text, account=account, mapping=mapping)
+        _record_import_batch(
+            account,
+            preview["total_rows"],
+            preview["valid_rows"],
+            len(preview["errors"]) + len(exc.errors),
+            [*preview["errors"], *exc.errors],
+            status="Failed",
+        )
+        frappe.throw(str(exc))
+    _record_import_batch(
+        account, result["posted"], result["posted"],
+        0, [], status="Imported",
+    )
+    return result
+
+
+def _record_import_batch(account, total_rows, imported, failed, errors, status):
+    """Persist one Import Batch with its per-row Import Error table."""
+    frappe.flags.investing_internal = True
+    try:
+        batch = frappe.get_doc(
+            {
+                "doctype": "Import Batch",
+                "source": "CSV Import",
+                "account": account,
+                "status": status,
+                "total_rows": total_rows,
+                "imported": imported,
+                "failed": failed,
+                "errors": [
+                    {"row_no": error.get("row"), "message": error.get("message")} for error in errors
+                ],
+            }
+        )
+        batch.insert(ignore_permissions=True)
+        return batch.name
+    finally:
+        frappe.flags.investing_internal = False
+
+
 # ---------------------------------------------------------------- benchmarks
+
+# ------------------------------------------------------- method cards
+def _card_portfolio(*args, **kwargs):
+    """Resolve which portfolio a Method-type Number Card is asking about.
+
+    Desk invokes Method cards with varying conventions, so accept anything
+    and look for a portfolio name; fall back to the first portfolio,
+    mirroring allocation_chart.get_data.
+    """
+    seen = []
+
+    def _collect(value):
+        if isinstance(value, str):
+            try:
+                value = frappe.parse_json(value)
+            except Exception:
+                pass
+        if isinstance(value, dict):
+            seen.append(value.get("portfolio"))
+            filters = value.get("filters")
+            if isinstance(filters, dict):
+                seen.append(filters.get("portfolio"))
+            elif isinstance(filters, list):
+                for item in filters:
+                    if (
+                        isinstance(item, (list, tuple))
+                        and len(item) >= 4
+                        and item[1] in ("portfolio", "name")
+                    ):
+                        seen.append(item[3])
+        elif isinstance(value, str):
+            seen.append(value)
+
+    for arg in args:
+        _collect(arg)
+    _collect(kwargs)
+
+    for name in seen:
+        if isinstance(name, str) and frappe.db.exists("Portfolio", name):
+            _check_portfolio(name)
+            return name
+    rows = frappe.get_all("Portfolio", pluck="name", limit_page_length=1)
+    if rows:
+        _check_portfolio(rows[0])
+        return rows[0]
+    return None
+
+
+def _card_metric(key, *args, **kwargs):
+    _user()
+    name = _card_portfolio(*args, **kwargs)
+    if not name:
+        return 0
+    value = services.performance_summary(name).get(key)
+    return float(value) if value is not None else 0
+
+
+@frappe.whitelist()
+def portfolio_twr_ytd(*args, **kwargs):
+    """YTD time-weighted return, backing the "TWR YTD" Number Card."""
+    return _card_metric("twr_ytd", *args, **kwargs)
+
+
+@frappe.whitelist()
+def portfolio_xirr_ytd(*args, **kwargs):
+    """YTD money-weighted (XIRR) return, backing the "XIRR YTD" Number Card."""
+    return _card_metric("xirr_ytd", *args, **kwargs)
+
+
+@frappe.whitelist()
+def portfolio_sharpe_ytd(*args, **kwargs):
+    """YTD Sharpe ratio, backing the "Sharpe YTD" Number Card."""
+    return _card_metric("sharpe_ytd", *args, **kwargs)
 @frappe.whitelist()
 def benchmark_list():
     """The curated benchmark catalog, for the comparison picker."""
