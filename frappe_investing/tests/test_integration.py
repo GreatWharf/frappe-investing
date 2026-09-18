@@ -84,6 +84,57 @@ class TestInvestingIntegration(IntegrationTestCase):
             }
         ).insert()
 
+    def test_csv_preview_flags_unknown_securities(self):
+        # Preview must resolve tickers the same way post does: a row preview
+        # called valid but post refused (US:AAPL with ticker "AAPL" present,
+        # since the convention is full-key tickers like sync_service's).
+        from frappe_investing.importer import post_import, preview_import
+
+        header = (
+            "date,type,security_key,qty,price,amount,gross,fees,taxes,withholding,currency,"
+            "accrued_interest,split_ratio,basis_allocation,child_security,child_ratio,"
+            "lot_ids,target_currency,target_amount,notes,source_ref\n"
+        )
+        bad = header + "2026-01-05,Buy,US:NOPE9,1,10,,,,,,USD,,,,,,,,,x,IMP-X1\n"
+        out = preview_import(bad, account=self.account.name)
+        self.assertEqual(out["valid_rows"], 0)
+        self.assertEqual(out["error_rows"], 1)
+        self.assertIn("Unknown security", out["errors"][0]["message"])
+        with self.assertRaises(Exception):
+            post_import(bad, account=self.account.name)
+
+        good = header + f"2026-01-05,Buy,US:{self.security.ticker},1,10,,,,,,USD,,,,,,,,,x,IMP-X2\n"
+        frappe.get_doc("Security", self.security.name).db_set("ticker", f"US:{self.security.ticker}")
+        out = preview_import(good, account=self.account.name)
+        self.assertEqual(out["valid_rows"], 1)
+
+    def test_license_key_round_trips_and_unlocks_pro(self):
+        # license_key is a Password field: _resolve read it back with
+        # doc.get(), fed the encrypted blob to evaluate(), and every status
+        # call reported "invalid" right after a successful save.
+        import base64
+
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        from frappe_investing import license_service, licensing
+
+        private = Ed25519PrivateKey.generate()
+        public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        original = licensing.PUBLIC_KEY
+        licensing.PUBLIC_KEY = base64.urlsafe_b64encode(public).decode()
+        try:
+            key = licensing.sign_license(
+                {"product": licensing.PRODUCT, "tier": "pro", "customer": "Test Co", "expires": "2099-01-01"},
+                private,
+            )
+            saved = license_service.save_license(key)
+            self.assertEqual(saved["tier"], "pro")
+            # The saved key must survive a fresh read, not just the save call.
+            self.assertEqual(license_service.public_state()["tier"], "pro")
+        finally:
+            licensing.PUBLIC_KEY = original
+
     def test_get_dashboard_tolerates_form_encoded_risk_free_rate(self):
         # The desk page calls this over HTTP, where arguments arrive as
         # strings; flt() turned risk_free_rate into a float and the money

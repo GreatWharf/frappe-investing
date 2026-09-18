@@ -57,7 +57,9 @@ def _cached_cloud_state(doc):
 
 def _resolve(doc):
     """Merge the cached Cloud plan with the stored key, persisting a changed verdict."""
-    state = most_generous(_cached_cloud_state(doc), evaluate(doc.get("license_key") or ""))
+    # license_key is a Password field: doc.get() hands back the stored blob,
+    # only get_password() decrypts it for evaluate().
+    state = most_generous(_cached_cloud_state(doc), evaluate(doc.get_password("license_key") or ""))
     if (state.status, state.tier, state.source) != (doc.status, doc.tier, doc.get("source") or ""):
         _persist(doc, state)
     return state
@@ -216,7 +218,7 @@ def refresh_cloud_subscription():
             _set_cloud(doc, doc.get("cloud_plan") or "", doc.get("cloud_site") or "", str(exc), read=False)
         else:
             _set_cloud(doc, *_read_plan(info), read=True)
-    _persist(doc, most_generous(_cached_cloud_state(doc), evaluate(doc.get("license_key") or "")))
+    _persist(doc, most_generous(_cached_cloud_state(doc), evaluate(doc.get_password("license_key") or "")))
     return public_state()
 
 

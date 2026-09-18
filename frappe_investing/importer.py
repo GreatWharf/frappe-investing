@@ -113,19 +113,31 @@ def preview_import(csv_text, *, account, mapping=None):
     """Parse only. Returns counts, per-type breakdown, events and row errors."""
     _account_or_throw(account)
     parsed = csv_import.parse_csv(csv_text, mapping=mapping, account=account)
-    events = parsed["events"]
+    # Resolve securities now, not just at post time: a preview that calls an
+    # unresolvable row valid and a post that then refuses it is a lie.
+    events = []
+    errors = list(parsed["errors"])
+    for event in parsed["events"]:
+        if event.get("security_key") and not _resolve_security(event["security_key"]):
+            errors.append(
+                {
+                    "row": (event.get("meta") or {}).get("csv_row"),
+                    "message": f"Unknown security {event['security_key']!r}: create the Security first.",
+                }
+            )
+            continue
+        events.append(event)
     by_type = {}
     for event in events:
         by_type[event["type"]] = by_type.get(event["type"], 0) + 1
-    total_rows = len(events) + len(parsed["errors"])
     return {
         "account": account,
-        "total_rows": total_rows,
+        "total_rows": len(events) + len(errors),
         "valid_rows": len(events),
-        "error_rows": len(parsed["errors"]),
+        "error_rows": len(errors),
         "by_type": by_type,
         "events": events,
-        "errors": parsed["errors"],
+        "errors": errors,
     }
 
 
