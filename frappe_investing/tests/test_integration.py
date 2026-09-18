@@ -84,6 +84,26 @@ class TestInvestingIntegration(IntegrationTestCase):
             }
         ).insert()
 
+    def test_get_dashboard_tolerates_form_encoded_risk_free_rate(self):
+        # The desk page calls this over HTTP, where arguments arrive as
+        # strings; flt() turned risk_free_rate into a float and the money
+        # guard then rejected the whole dashboard payload with a TypeError.
+        from frappe_investing import api
+
+        record_event(
+            {
+                "event_type": "Deposit",
+                "posting_date": "2026-01-02",
+                "account": self.account.name,
+                "amount": "1000",
+                "currency": "USD",
+                "source": "Manual",
+            }
+        )
+        payload = api.get_dashboard(self.portfolio.name, risk_free_rate="0.04")
+        self.assertEqual(str(payload["performance"]["risk_free_rate"]), "0.04")
+        self.assertEqual(payload["portfolio"], self.portfolio.name)
+
     def test_buy_sell_creates_lots_allocations_and_realized_pnl(self):
         buy, created = record_event(
             {

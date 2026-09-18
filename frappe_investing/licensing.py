@@ -28,9 +28,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 PRODUCT = "frappe-investing"
 PREFIX = "FINV1"
 
-# Dev/test keypair. The publisher's private key never ships; generate production keys
-# with scripts/make_license.py and replace this public key at release time.
-PUBLIC_KEY = ""
+# Production public key. The matching private key lives offline with the
+# publisher (0600, never committed); sign new licenses with
+# scripts/make_license.py --private-key-file <publisher key>.
+PUBLIC_KEY = "iaIdjpbZzmg7UapKsyAVpCNI0EdeqPXfaWqbHuU0ezQ="
 
 # (max_asset_classes, max_value, value_currency); None means no limit.
 # One paid plan, and it covers everything — stated as unlimited rather than as

@@ -3,6 +3,7 @@
 import frappe
 
 from . import importer, license_service, services, sync_service
+from .core.money import dec
 
 
 def _user():
@@ -30,9 +31,9 @@ def has_permission():
 def get_dashboard(portfolio=None, risk_free_rate=0):
     _user()
     settings = services.settings()
-    from frappe.utils import flt
-
-    risk_free_rate = flt(risk_free_rate)
+    # HTTP arguments arrive as strings; coerce with the money helper, not
+    # flt(), whose float result the accounting guard rejects downstream.
+    risk_free_rate = dec(risk_free_rate or 0)
     portfolios = frappe.get_all(
         "Portfolio", fields=["name", "portfolio_name", "company", "base_currency"], limit_page_length=200
     )
@@ -495,10 +496,8 @@ def compare_benchmark(portfolio, benchmark, risk_free_rate=0):
     """YTD portfolio performance against one benchmark index."""
     _user()
     _check_portfolio(portfolio)
-    from frappe.utils import flt
-
     return services.benchmark_return(
-        portfolio, benchmark, risk_free_rate=flt(risk_free_rate)
+        portfolio, benchmark, risk_free_rate=dec(risk_free_rate or 0)
     )
 
 
