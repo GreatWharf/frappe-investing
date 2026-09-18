@@ -75,6 +75,39 @@ def test_stooq_has_no_search():
     assert provider.search("apple") == []
 
 
+def test_stooq_http_error_is_market_data_error_not_broker_error():
+    """A non-2xx from stooq must surface as MarketDataError.
+
+    sync_service.refresh_prices catches MarketDataError per security and
+    continues; a raw BrokerError escaping the adapter 500s the whole
+    refresh (seen live when stooq answered 404).
+    """
+    sess = FakeSession()
+    sess.add("GET", "stooq.com", FakeResponse(404, "not found"))
+    provider = stooq.StooqProvider(session=sess)
+    with pytest.raises(MarketDataError) as err:
+        provider.daily_prices(["AAPL.US"], date(2026, 9, 15))
+    assert err.value.code == "not_found"
+
+
+def test_stooq_anti_bot_challenge_maps_to_blocked():
+    """Stooq now gates anonymous CSV behind a JavaScript proof-of-work
+    challenge (HTTP 200 with an HTML page, not CSV). Detect the challenge
+    and say so plainly instead of silently returning no rows.
+    """
+    challenge = (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'
+        "<noscript>This site requires JavaScript to verify your browser.</noscript>"
+        '<script>fetch("/__verify",{method:"POST"})</script></body></html>'
+    )
+    sess = FakeSession()
+    sess.add("GET", "stooq.com", FakeResponse(200, challenge))
+    provider = stooq.StooqProvider(session=sess)
+    with pytest.raises(MarketDataError) as err:
+        provider.daily_prices(["AAPL.US"], date(2026, 9, 15))
+    assert err.value.code == "blocked"
+
+
 # --- Alpha Vantage ----------------------------------------------------------
 
 

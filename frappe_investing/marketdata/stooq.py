@@ -16,10 +16,11 @@ Date,Open,High,Low,Close,Volume. One request per symbol.
 import csv
 import io
 
-from ..connectors.base import http_request
+from ..connectors.base import BrokerError, http_request
 from .base import MarketDataError, ProviderBase, day_str
 
 _RATE_LIMIT_PREFIX = "Exceeded the daily hits limit"
+_ANTI_BOT_MARKERS = ("__verify", "requires JavaScript to verify")
 
 
 class StooqProvider(ProviderBase):
@@ -36,13 +37,27 @@ class StooqProvider(ProviderBase):
         compact = target_day.replace("-", "")
         quotes = []
         for key in security_keys:
-            body = http_request(
-                self.session,
-                "GET",
-                self.URL,
-                params={"s": self.symbol_map.get(key, key), "d1": compact, "d2": compact, "i": "d"},
-            )
+            try:
+                body = http_request(
+                    self.session,
+                    "GET",
+                    self.URL,
+                    params={"s": self.symbol_map.get(key, key), "d1": compact, "d2": compact, "i": "d"},
+                )
+            except BrokerError as exc:
+                # Translate into the market-data error type so callers
+                # (refresh_prices) log and continue instead of 500ing.
+                raise MarketDataError(f"Stooq request failed: {exc}", code=exc.code) from exc
             text = body.decode("utf-8", "replace").strip()
+            if any(marker in text for marker in _ANTI_BOT_MARKERS):
+                # Stooq gates anonymous CSV behind a JavaScript proof-of-work
+                # challenge (HTTP 200 with an HTML page, never parseable as
+                # CSV). Name it plainly rather than returning "no data".
+                raise MarketDataError(
+                    "Stooq is blocking automated access with an anti-bot challenge; "
+                    "choose another price provider or import prices via CSV",
+                    code="blocked",
+                )
             if text.startswith(_RATE_LIMIT_PREFIX):
                 raise MarketDataError("Stooq daily hit limit exceeded", code="rate_limited")
             rows = [row for row in csv.DictReader(io.StringIO(text)) if row.get("Close")]
