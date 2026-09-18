@@ -21,7 +21,7 @@ jobs:
           node-version: '24'
       - name: Fast offline gate (no bench)
         run: |
-          python -m pip install pytest ruff
+          python -m pip install -e . pytest ruff
           python -m pytest -q
           python -m ruff check .
           python scripts/preflight.py
