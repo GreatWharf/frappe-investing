@@ -55,7 +55,7 @@ def journal_lines(event, policy, *, rates, on, allocations=None):
         raise UnmappedEvent(
             f"No accounting rule for {event.type}. Add it to the Investment Accounting Policy."
         )
-    rate = rates.rate(event.currency, policy.company_currency, on)
+    rate = rates.rate_on_or_before(event.currency, policy.company_currency, on)
 
     def company(amount):
         return q(dec(amount) * rate, 2)
@@ -68,13 +68,16 @@ def journal_lines(event, policy, *, rates, on, allocations=None):
             lines.append(_line(rule.fee_debit or rule.debit, company(event.accrued_interest), 0))
         lines.append(_line(rule.credit, 0, company(cost + dec(event.fees) + dec(event.accrued_interest))))
     elif event.type in {SELL, CASH_IN_LIEU, REDEMPTION}:
-        proceeds = dec(event.qty) * dec(event.price) - dec(event.fees) - dec(event.taxes)
+        accrued = dec(event.accrued_interest)
+        proceeds = dec(event.qty) * dec(event.price) - dec(event.fees) - dec(event.taxes) + accrued
         cost = sum((a.cost for a in (allocations or [])), dec(0))
         if allocations is None:
             raise UnmappedEvent(f"{event.type} requires lot allocations before accounting.")
         realized = sum((a.realized_pnl for a in allocations), dec(0))
         lines.append(_line(rule.debit, company(proceeds), 0))
         lines.append(_line(rule.credit, 0, company(cost)))
+        if accrued:
+            lines.append(_line(rule.credit, 0, company(accrued)))
         if realized and rule.pnl_account:
             if realized > 0:
                 lines.append(_line(rule.pnl_account, 0, company(realized)))
@@ -105,6 +108,26 @@ def journal_lines(event, policy, *, rates, on, allocations=None):
         raise UnmappedEvent(
             f"{event.type} has no journal mapping in v1; cash/transfer/corporate actions post through their cash or trade legs."
         )
-    if sum(line.debit for line in lines) != sum(line.credit for line in lines):
-        raise UnmappedEvent(f"Accounting mapping for {event.type} produced unbalanced lines.")
+    debit_total = sum((line.debit for line in lines), dec(0))
+    credit_total = sum((line.credit for line in lines), dec(0))
+    diff = q(debit_total - credit_total, 2)
+    if diff:
+        # Per-line FX rounding can leave a 1-cent imbalance on multi-leg
+        # entries. Plug the largest leg so valid events still post; anything
+        # larger is a real mapping error and fails closed.
+        if abs(diff) > dec("0.05"):
+            raise UnmappedEvent(f"Accounting mapping for {event.type} produced unbalanced lines.")
+        if diff > 0:
+            candidates = [line for line in lines if line.credit]
+        else:
+            candidates = [line for line in lines if line.debit]
+        if not candidates:
+            raise UnmappedEvent(f"Accounting mapping for {event.type} produced unbalanced lines.")
+        target = max(
+            candidates, key=lambda line: line.credit if diff > 0 else line.debit
+        )
+        if diff > 0:
+            target.credit = q(target.credit + diff, 2)
+        else:
+            target.debit = q(target.debit - diff, 2)
     return lines

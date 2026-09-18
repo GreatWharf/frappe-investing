@@ -56,6 +56,11 @@ class Row(dict):
         self.dedupe_key = hashlib.sha256(raw.encode()).hexdigest()[:40]
 
     def to_core_event(self):
+        # NOTE: kept in sync with documents.ManagedDocument.to_core_event;
+        # tests/test_fixture_parity.py fails if this copy drifts (lot_ids,
+        # target_*, notes, meta). New tests should use tests/support.py.
+        import json
+
         from frappe_investing.core.events import Event
         from frappe_investing.core.money import dec
 
@@ -80,8 +85,13 @@ class Row(dict):
             basis_allocation=d("basis_allocation"),
             child_ratio=d("child_ratio"),
             child_security=self.get("child_security"),
+            target_currency=self.get("target_currency"),
+            target_amount=d("target_amount"),
+            lot_ids=tuple(x.strip() for x in (self.get("lot_ids") or "").split(",") if x.strip()),
             source=self.get("source", "Manual"),
             source_ref=self.get("source_ref", ""),
+            notes=self.get("notes") or "",
+            meta=json.loads(self.get("meta_json") or "{}"),
         )
 
 
@@ -165,6 +175,10 @@ def services(monkeypatch):
             return None
         if isinstance(fieldname, str):
             return rows[0].get(fieldname)
+        if isinstance(fieldname, (list, tuple)):
+            # Production returns an attribute-access object for a field list
+            # (as_dict=True); mirror that, not a plain list.
+            return Row({f: rows[0].get(f) for f in fieldname})
         return rows[0]
 
     def get_all(dt, filters=None, fields=None, pluck=None, order_by=None, limit_page_length=None, **kw):
@@ -527,6 +541,44 @@ def test_benchmark_security_is_created_outside_license_class_count(services):
     assert row.currency == "USD"
     # Idempotent: a second lookup returns the same row.
     assert services_mod._benchmark_security(benchmarks.get("SP500")) == name
+
+
+def test_external_flows_exclude_fees_and_fx_conversions(services):
+    """Only Deposit/Withdrawal move investor capital — fees are internal."""
+    services_mod, fake, store = services
+    day = date(2026, 2, 1)
+    _event(store, event_type="Deposit", posting_date=day, account="a1", amount="1000",
+           currency="USD", source="Manual", docstatus=1)
+    _event(store, event_type="Fee", posting_date=day, account="a1", amount="50",
+           currency="USD", source="Manual", docstatus=1)
+    _event(store, event_type="FX Conversion", posting_date=day, account="a1", amount="200",
+           currency="USD", target_currency="EUR", target_amount="180", source="Manual", docstatus=1)
+    assert services_mod._external_flows("p1", day) == D(1000)
+
+
+def test_external_flows_and_xirr_convert_foreign_currency_to_base(services):
+    """Cross-currency investor flows convert to base via the FX book."""
+    services_mod, fake, store = services
+    store["fx-eur"] = Row(
+        doctype="FX Rate", name="fx-eur", from_currency="EUR", to_currency="USD",
+        date=date(2026, 1, 1), rate="1.1",
+    )
+    _event(store, event_type="Deposit", posting_date=date(2026, 1, 10), account="a1",
+           amount="1000", currency="EUR", source="Manual", docstatus=1)
+    flows = services_mod._external_flows(
+        "p1", date(2026, 1, 10), base_currency="USD", rates=services_mod._rate_book("Acme")
+    )
+    assert flows == D(1100)  # EUR 1000 x 1.1
+    store["sp1"] = Row(
+        doctype="Security Price", name="sp1", security="sec-aapl",
+        date=date(2026, 2, 1), close="10", currency="USD", source="Manual",
+    )
+    store["snap1"] = Row(
+        doctype="Portfolio Snapshot", name="snap1", portfolio="p1",
+        date=date(2026, 2, 1), total_value="1210", external_flow="1100",
+    )
+    summary = services_mod.performance_summary("p1", as_of=date(2026, 2, 1))
+    assert summary["xirr_ytd"] is not None  # foreign-currency flow converts, XIRR solves
 
 
 def test_sync_event_payload_carries_connection(services, monkeypatch):

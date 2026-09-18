@@ -26,7 +26,7 @@ def positions_value(engine, prices, day, *, base, fx, asset_classes, currencies=
                 },
             )
             bucket["qty"] += lot.qty
-            bucket["cost"] += lot.cost
+            bucket["cost"] += fx.convert_on_or_before(lot.cost, lot.currency, base, day)
             price = prices.get((security, day))
             if price is None:
                 bucket["market_value"] = None
@@ -39,11 +39,12 @@ def positions_value(engine, prices, day, *, base, fx, asset_classes, currencies=
             bucket["last_price"] = dec(price)
             bucket["price_currency"] = ccy
             mv_native = lot.qty * dec(price)
-            mv_base = fx.convert(mv_native, ccy, base, day)
+            mv_base = fx.convert_on_or_before(mv_native, ccy, base, day)
             bucket["market_value"] += q(mv_base, 2)
     for security, bucket in by_security.items():
         bucket["cost"] = q(bucket["cost"], 2)
         if bucket["market_value"] is None:
+            total_cost += bucket["cost"]
             continue
         bucket["market_value"] = q(bucket["market_value"], 2)
         bucket["unrealized_pnl"] = bucket["market_value"] - bucket["cost"]

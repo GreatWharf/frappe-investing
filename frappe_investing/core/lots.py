@@ -259,7 +259,13 @@ class LotEngine:
         return LotResult(new_lots=moved)
 
     def _transfer_in(self, event):
-        incoming = [lot.clone(account=event.account) for lot in event.meta.get("lots", [])]
+        # Transfer In is a manual fallback only: the normal path is a Transfer
+        # Out, whose destination Tax Lot rows are written directly by
+        # services._persist_transfer_out (same submit, same portfolio). A
+        # hand-posted Transfer In would double-count those rows, so it is
+        # rejected unless it carries explicit lots (engine-level callers).
+        raw = list(event.meta.get("lots", []))
+        incoming = [lot.clone(account=event.account) if hasattr(lot, "clone") else Lot(account=event.account, **lot) for lot in raw]
         if not incoming:
             raise LotError("Transfer In requires carried lots (meta['lots']).")
         if sum((lot.qty for lot in incoming), dec(0)) != dec(event.qty):

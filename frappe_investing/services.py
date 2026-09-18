@@ -10,7 +10,7 @@ import frappe
 from frappe.utils import today
 
 from .core import accounting, performance, valuation
-from .core.events import CASH_EVENTS, INCOME_EVENTS, LOT_EVENTS
+from .core.events import INCOME_EVENTS, LOT_EVENTS
 from .core.fx import RateBook
 from .core.lots import LotEngine
 from .core.money import dec, q
@@ -39,7 +39,13 @@ def record_event(data, *, submit=True):
             "Investment Event", {"dedupe_key": doc.dedupe_key}, ["name", "docstatus"], as_dict=True
         )
         if existing:
-            return existing.name, False
+            if existing.docstatus == 2:
+                # Resync after cancel: the old row is dead — clear its key so
+                # the re-posted event gets a fresh identity, then proceed to
+                # insert below instead of returning the cancelled document.
+                frappe.db.set_value("Investment Event", existing.name, "dedupe_key", None)
+            else:
+                return existing.name, False
     doc.insert()
     if submit:
         doc.submit()
@@ -72,13 +78,23 @@ def _engine_for(account_name, security_name):
 
 
 def apply_event(doc):
-    """on_submit: move lots, record allocations, post accounting."""
+    """on_submit: move lots, record allocations, post accounting.
+
+    Transfers move Tax Lot rows between accounts directly (see
+    ``_persist_transfer_out``): the destination rows are written at submit
+    time with status Open, so shares are never parked in the ephemeral
+    engine buffer and no in-memory chaining is needed.
+    """
+    from .core.events import TRANSFER_OUT
+
     event = doc.to_core_event()
     result = None
     if event.type in LOT_EVENTS:
         engine = _engine_for(doc.account, doc.security)
         result = engine.apply(event)
         _persist_lots(doc, engine, result)
+        if event.type == TRANSFER_OUT:
+            _persist_transfer_out(doc, result.new_lots)
     if event.type in INCOME_EVENTS or event.type in {"Buy", "Sell", "Cash-in-lieu", "Redemption", "Fee"}:
         _apply_accounting(doc, event, result.allocations if result else None)
     else:
@@ -135,6 +151,53 @@ def _persist_lots(doc, engine, result):
                     "proceeds": str(q(allocation.proceeds, 4)),
                     "realized_pnl": str(q(allocation.realized_pnl, 4)),
                     "acquired": allocation.acquired,
+                }
+            ).insert(ignore_permissions=True)
+    finally:
+        frappe.flags.investing_internal = False
+
+
+def _persist_transfer_out(doc, moved_lots):
+    """Write the destination leg of a Transfer Out as real Tax Lot rows.
+
+    The engine parks moved lots in its ephemeral ``transferred`` buffer, which
+    dies with the per-event LotEngine — so without this, the source position
+    drops and nothing is created anywhere. The destination is the event's
+    ``target_account`` (required by _validate_transfer, same portfolio,
+    enabled — re-checked here for engine-level callers). Rows carry the
+    destination account, original cost/acquired dates, and
+    ``source_event`` = the Transfer Out, so cost basis and history survive.
+    A matching Transfer In event is not required and never was: posting one
+    would double-count (its engine path would create the same rows again).
+    """
+    if not moved_lots:
+        return
+    dest = doc.get("target_account")
+    if not dest:
+        frappe.throw("Transfer Out requires a target account.")
+    dest_portfolio = frappe.db.get_value("Investment Account", dest, "portfolio")
+    if dest_portfolio != _portfolio_of(doc):
+        frappe.throw("Transfer target must be in the same portfolio as the source account.")
+    if frappe.db.get_value("Investment Account", dest, "enabled") != 1:
+        frappe.throw("Transfer target account is not enabled.")
+    frappe.flags.investing_internal = True
+    try:
+        for lot in moved_lots:
+            if lot.qty <= 0:
+                continue
+            frappe.get_doc(
+                {
+                    "doctype": "Tax Lot",
+                    "account": dest,
+                    "security": doc.security,
+                    "qty_open": str(lot.qty),
+                    "qty_original": str(lot.qty),
+                    "unit_cost": str(lot.unit_cost),
+                    "currency": lot.currency,
+                    "acquired": lot.acquired,
+                    "source_event": doc.name,
+                    "status": "Open",
+                    "engine_id": lot.id,
                 }
             ).insert(ignore_permissions=True)
     finally:
@@ -201,8 +264,12 @@ def _apply_accounting(doc, event, allocations):
     frappe.db.set_value(doc.doctype, doc.name, {"journal_entry": je.name, "accounting_status": "Posted"})
 
 
+def _portfolio_of(doc):
+    return frappe.db.get_value("Investment Account", doc.account, "portfolio")
+
+
 def _company_of(doc):
-    portfolio = frappe.db.get_value("Investment Account", doc.account, "portfolio")
+    portfolio = _portfolio_of(doc)
     return frappe.db.get_value("Portfolio", portfolio, "company") if portfolio else None
 
 
@@ -262,10 +329,50 @@ def reverse_event(doc):
             lot.status = "Open"
             lot.save(ignore_permissions=True)
             frappe.delete_doc("Lot Allocation", allocation.name, ignore_permissions=True)
+        # An AVERAGE buy merges into a pre-existing lot in place (lots._buy):
+        # no allocations and no new Tax Lot row, so un-merge it here. The merge
+        # is linear (qty += buy_qty, unit_cost = total_cost / qty), so the
+        # pre-image is the exact arithmetic inverse of the buy.
+        if doc.event_type == "Buy" and cost_method_for(_portfolio_of(doc)) == "AVERAGE":
+            _unmerge_average_buy(doc)
+            return
         for lot in frappe.get_all("Tax Lot", filters={"source_event": doc.name}, pluck="name"):
             frappe.delete_doc("Tax Lot", lot, ignore_permissions=True)
     finally:
         frappe.flags.investing_internal = False
+
+
+def _unmerge_average_buy(doc):
+    """Restore the lot an AVERAGE buy merged into, then drop no rows.
+
+    Merge math (lots._buy): lot.qty += buy_qty;
+    lot.unit_cost = (old_qty * old_unit_cost + buy_qty * price + fees) / new_qty.
+    Inverting: old_qty = new_qty - buy_qty;
+    old_unit_cost = (new_qty * new_unit_cost - buy_qty * price - fees) / old_qty.
+    """
+    buy_qty = dec(doc.qty)
+    buy_price, buy_fees = dec(doc.price), dec(doc.get("fees") or 0)
+    merged = frappe.get_all(
+        "Tax Lot",
+        filters={"account": doc.account, "security": doc.security, "status": "Open"},
+        fields=["name", "qty_open", "unit_cost"],
+    )
+    if len(merged) != 1:
+        frappe.throw(
+            f"Cannot cancel: expected one merged lot for {doc.security} in {doc.account}, "
+            f"found {len(merged)}."
+        )
+    row = merged[0]
+    old_qty = dec(row.qty_open) - buy_qty
+    if old_qty <= 0:
+        frappe.delete_doc("Tax Lot", row.name, ignore_permissions=True)
+        return
+    old_unit_cost = (dec(row.qty_open) * dec(row.unit_cost) - buy_qty * buy_price - buy_fees) / old_qty
+    frappe.db.set_value(
+        "Tax Lot",
+        row.name,
+        {"qty_open": str(old_qty), "unit_cost": str(old_unit_cost)},
+    )
 
 
 # ---------------------------------------------------------------- valuation
@@ -329,8 +436,14 @@ def snapshot_portfolio(portfolio_name, day=None):
     """Persist a daily snapshot; idempotent per portfolio/day."""
     day = day or today()
     existing = frappe.db.get_value("Portfolio Snapshot", {"portfolio": portfolio_name, "date": day}, "name")
+    portfolio_doc = frappe.get_doc("Portfolio", portfolio_name)
+    base = portfolio_doc.base_currency or frappe.get_cached_value(
+        "Company", portfolio_doc.company, "default_currency"
+    )
     values = value_portfolio(portfolio_name, day)
-    flows = _external_flows(portfolio_name, day)
+    flows = _external_flows(
+        portfolio_name, day, base_currency=base, rates=_rate_book(portfolio_doc.company)
+    )
     realized, income_amt = _period_totals(portfolio_name, day)
     data = {
         "portfolio": portfolio_name,
@@ -369,7 +482,12 @@ def snapshot_portfolio(portfolio_name, day=None):
     return doc.name
 
 
-def _external_flows(portfolio_name, day):
+def _external_flows(portfolio_name, day, *, base_currency=None, rates=None):
+    """Investor cash in/out for one day, in base currency.
+
+    Only Deposit/Withdrawal move investor capital — Fee and FX Conversion
+    are internal and never count as external flows.
+    """
     accounts = frappe.get_all("Investment Account", filters={"portfolio": portfolio_name}, pluck="name")
     rows = frappe.get_all(
         "Investment Event",
@@ -377,14 +495,19 @@ def _external_flows(portfolio_name, day):
             "account": ["in", accounts or ["-"]],
             "posting_date": day,
             "docstatus": 1,
-            "event_type": ["in", list(CASH_EVENTS)],
+            "event_type": ["in", ["Deposit", "Withdrawal"]],
         },
-        fields=["event_type", "amount"],
+        fields=["event_type", "amount", "currency"],
     )
     total = dec(0)
     for row in rows:
-        sign = dec(1) if row.event_type in {"Deposit"} else dec(-1)
-        total += sign * dec(row.amount or 0)
+        sign = dec(1) if row.event_type == "Deposit" else dec(-1)
+        amount = sign * dec(row.amount or 0)
+        if base_currency and row.get("currency") and row.currency != base_currency:
+            if rates is None:
+                raise ValueError("An FX RateBook is required to convert external flows to base currency.")
+            amount = q(rates.convert_on_or_before(amount, row.currency, base_currency, day), 2)
+        total += amount
     return total
 
 
@@ -443,23 +566,28 @@ def performance_summary(portfolio_name, as_of=None, risk_free_rate=0):
         )
     ]
     twr = performance.twr(snaps)
-    flows = [
-        (row.posting_date, -_flow_sign(row))
-        for row in frappe.get_all(
-            "Investment Event",
-            filters={
-                "account": [
-                    "in",
-                    frappe.get_all("Investment Account", filters={"portfolio": portfolio_name}, pluck="name")
-                    or ["-"],
-                ],
-                "event_type": ["in", ["Deposit", "Withdrawal"]],
-                "docstatus": 1,
-                "posting_date": ["between", [start, as_of]],
-            },
-            fields=["posting_date", "event_type", "amount"],
-        )
-    ]
+    base = _portfolio_base_currency(portfolio_name)
+    book = _rate_book(_portfolio_company(portfolio_name))
+    flows_raw = frappe.get_all(
+        "Investment Event",
+        filters={
+            "account": [
+                "in",
+                frappe.get_all("Investment Account", filters={"portfolio": portfolio_name}, pluck="name")
+                or ["-"],
+            ],
+            "event_type": ["in", ["Deposit", "Withdrawal"]],
+            "docstatus": 1,
+            "posting_date": ["between", [start, as_of]],
+        },
+        fields=["posting_date", "event_type", "amount", "currency"],
+    )
+    flows = []
+    for row in flows_raw:
+        amount = dec(row.amount or 0) if row.event_type == "Deposit" else -dec(row.amount or 0)
+        if row.get("currency") and row.currency != base:
+            amount = q(book.convert_on_or_before(amount, row.currency, base, row.posting_date), 2)
+        flows.append((row.posting_date, -amount))
     terminal = snaps[-1].value if snaps else dec(0)
     try:
         xirr = performance.xirr(flows, terminal, date.fromisoformat(str(as_of))) if flows else None
@@ -476,10 +604,6 @@ def performance_summary(portfolio_name, as_of=None, risk_free_rate=0):
         "income_ytd": income_amt,
         "snapshots": len(snaps),
     }
-
-
-def _flow_sign(row):
-    return dec(row.amount) if row.event_type == "Deposit" else -dec(row.amount)
 
 
 def benchmark_return(portfolio_name, benchmark_code, as_of=None, risk_free_rate=0):
@@ -625,6 +749,12 @@ def rebuild_positions(account_name, security_name):
                 pluck="name",
             ):
                 frappe.db.set_value("Tax Lot", lot_name, "status", "Closed")
+            # Engine ids already written during THIS replay. Splits, stock
+            # dividends, spin-offs and AVERAGE buys return the (mutated)
+            # EXISTING lots as new_lots — persisting each sighting would
+            # duplicate the position (Buy 100 + 2:1 split = rows of 100 AND
+            # 200). One Open row per engine id; later sightings update it.
+            replayed_ids = set()
             for row in rows:
                 doc = frappe.get_doc("Investment Event", row.name)
                 event = doc.to_core_event()
@@ -634,6 +764,18 @@ def rebuild_positions(account_name, security_name):
                 for lot in result.new_lots:
                     if lot.qty <= 0:
                         continue
+                    if lot.id in replayed_ids:
+                        row_name = frappe.db.get_value(
+                            "Tax Lot", {"engine_id": lot.id, "status": "Open"}, "name"
+                        )
+                        if row_name:
+                            frappe.db.set_value(
+                                "Tax Lot",
+                                row_name,
+                                {"qty_open": str(lot.qty), "unit_cost": str(lot.unit_cost)},
+                            )
+                        continue
+                    replayed_ids.add(lot.id)
                     frappe.get_doc(
                         {
                             "doctype": "Tax Lot",

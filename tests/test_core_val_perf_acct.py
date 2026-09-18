@@ -268,3 +268,174 @@ def test_unmapped_event_type_fails_closed():
     ).validate()
     with pytest.raises(accounting.UnmappedEvent):
         accounting.journal_lines(event, policy, rates=RateBook(), on=event.date)
+
+
+def test_valuation_converts_cost_basis_to_base_currency():
+    """Cost basis crosses currencies through the FX book (same-day on-or-before rate)."""
+    eng = LotEngine()
+    day = date(2026, 1, 5)
+    eng.apply(
+        Event(
+            type="Buy", date=day, account="IB", currency="USD", security="AAPL", qty=D(100), price=D(10)
+        ).validate()
+    )
+    book = RateBook()
+    book.set("USD", "GBP", date(2026, 1, 4), D("0.8"))
+    result = valuation.positions_value(
+        eng,
+        {("AAPL", day): D("11")},
+        day,
+        base="GBP",
+        fx=book,
+        asset_classes={"AAPL": "Equity"},
+        currencies={"AAPL": "USD"},
+    )
+    assert result["by_security"]["AAPL"]["cost"] == D("800.00")  # $1000 x 0.8
+    assert result["by_security"]["AAPL"]["market_value"] == D("880.00")  # $1100 x 0.8
+    assert result["unrealized_pnl"] == D("80.00")
+
+
+def test_valuation_stale_bucket_keeps_cost_in_totals():
+    """A missing price leaves value None but the lot cost still counts."""
+    eng, day = setup_engine()
+    book = RateBook()
+    result = valuation.positions_value(
+        eng,
+        {("AAPL", day): D("11")},
+        day,
+        base="USD",
+        fx=book,
+        asset_classes={"AAPL": "Equity", "VOD.L": "Equity"},
+    )
+    assert result["stale"] == ["VOD.L"]
+    assert result["by_security"]["VOD.L"]["market_value"] is None
+    assert result["by_security"]["VOD.L"]["cost"] == D("200.00")
+    assert result["total_cost"] == D("1200.00")  # 1000 AAPL + 200 stale VOD.L
+    assert result["total_value"] == D("1100.00")
+
+
+def test_valuation_uses_prior_fx_rate_when_same_day_missing():
+    """Exact-day FX gaps use the latest on-or-before rate, not MissingRate."""
+    eng, day = setup_engine()
+    book = RateBook()
+    book.set("USD", "GBP", date(2026, 1, 4), D("0.8"))
+    result = valuation.positions_value(
+        eng,
+        prices_for(day),
+        day,
+        base="GBP",
+        fx=book,
+        asset_classes={"AAPL": "Equity", "VOD.L": "Equity"},
+        currencies={"AAPL": "USD", "VOD.L": "GBP"},
+    )
+    assert result["by_security"]["AAPL"]["market_value"] == D("880.00")
+    assert result["total_value"] == D("1100.00")
+
+
+def test_sell_journal_carries_accrued_interest_leg_and_balances():
+    """A bond sell posts the accrued-interest credit mirroring the buy leg."""
+    policy = accounting.Policy(
+        company_currency="USD",
+        rules={
+            "Sell": accounting.Rule(
+                debit="Broker Cash", credit="Bond Investments", pnl_account="Realised Investment Gains"
+            )
+        },
+    )
+    eng = LotEngine()
+    day = date(2026, 1, 5)
+    eng.apply(
+        Event(
+            type="Buy",
+            date=day,
+            account="IB",
+            currency="USD",
+            security="BOND1",
+            qty=D(10),
+            price=D(100),
+            accrued_interest=D(20),
+        ).validate()
+    )
+    sell = Event(
+        type="Sell",
+        date=day,
+        account="IB",
+        currency="USD",
+        security="BOND1",
+        qty=D(10),
+        price=D(102),
+        accrued_interest=D(25),
+    ).validate()
+    allocations = eng.apply(sell).allocations
+    lines = accounting.journal_lines(sell, policy, rates=RateBook(), on=day, allocations=allocations)
+    # proceeds = 10x102 + 25 accrued = 1045; cost 1000; gain 20; interest credit 25
+    by_account = {}
+    for line in lines:
+        by_account.setdefault(line.account, []).append(line)
+    assert sum(line.debit for line in lines) == sum(line.credit for line in lines) == D(1045)
+    assert by_account["Broker Cash"][0].debit == D(1045)
+    assert sum(line.credit for line in by_account["Bond Investments"]) == D(1025)  # cost + accrued
+    assert by_account["Realised Investment Gains"][0].credit == D(20)
+
+
+def test_sell_journal_round_then_plug_keeps_valid_sells_posting():
+    """Per-line FX rounding imbalance is plugged to the largest leg, not rejected."""
+    policy = accounting.Policy(
+        company_currency="USD",
+        rules={
+            "Sell": accounting.Rule(
+                debit="Broker Cash", credit="Equity Investments", pnl_account="Realised Investment Gains"
+            )
+        },
+    )
+    eng = LotEngine()
+    day = date(2026, 1, 5)
+    eng.apply(
+        Event(
+            type="Buy",
+            date=day,
+            account="IB",
+            currency="EUR",
+            security="SAP",
+            qty=D(7),
+            price=D("33.33"),
+            fees=D("1.11"),
+        ).validate()
+    )
+    sell = Event(
+        type="Sell",
+        date=day,
+        account="IB",
+        currency="EUR",
+        security="SAP",
+        qty=D(7),
+        price=D("35.71"),
+        fees=D("1.13"),
+    ).validate()
+    allocations = eng.apply(sell).allocations
+    book = RateBook()
+    book.set("EUR", "USD", date(2026, 1, 4), D("1.0837"))
+    lines = accounting.journal_lines(sell, policy, rates=book, on=day, allocations=allocations)
+    assert sum(line.debit for line in lines) == sum(line.credit for line in lines)
+    assert sum(line.debit for line in lines) == D("269.67")  # EUR 248.84 x 1.0837, plugged
+
+
+def test_submit_time_rate_uses_on_or_before_when_same_day_missing():
+    """Events post with the latest prior FX rate instead of raising MissingRate."""
+    policy = accounting.Policy(
+        company_currency="USD",
+        rules={"Buy": accounting.Rule(debit="Equity Investments", credit="Broker Cash")},
+    )
+    event = Event(
+        type="Buy",
+        date=date(2026, 1, 5),
+        account="IB",
+        currency="EUR",
+        security="SAP",
+        qty=D(10),
+        price=D(10),
+    ).validate()
+    book = RateBook()
+    book.set("EUR", "USD", date(2026, 1, 4), D("1.1"))
+    lines = accounting.journal_lines(event, policy, rates=book, on=event.date)
+    assert sum(line.debit for line in lines) == sum(line.credit for line in lines) == D(110)
