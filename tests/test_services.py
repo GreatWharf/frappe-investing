@@ -360,6 +360,10 @@ def test_value_portfolio_aggregates_with_prices(services):
     assert result["total_value"] == D("1250.00")
     assert result["unrealized_pnl"] == D("250.00")
     assert result["stale"] == []
+    # Buckets carry display labels so the dashboard never shows raw doc IDs.
+    bucket = result["by_security"]["sec-aapl"]
+    assert bucket["security_name"] == "Apple"
+    assert bucket["ticker"] == "AAPL"
 
 
 def test_snapshot_is_idempotent_per_day(services):

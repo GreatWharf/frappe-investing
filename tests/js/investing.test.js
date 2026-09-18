@@ -32,8 +32,8 @@ function dashboardFixture() {
 			day: "2026-09-16",
 			base: "INR",
 			by_security: {
-				"SEC-RELIANCE": { qty: "10", cost: "20000", market_value: "28000.25", unrealized_pnl: "8000.25", asset_class: "Stock" },
-				"SEC-BADBOND": { qty: "5", cost: "5000", market_value: null, unrealized_pnl: "0", asset_class: "Bond" },
+				"SEC-RELIANCE": { qty: "10", cost: "20000", market_value: "28000.25", unrealized_pnl: "8000.25", asset_class: "Stock", security_name: "Reliance Industries", ticker: "RELIANCE" },
+				"SEC-BADBOND": { qty: "5", cost: "5000", market_value: null, unrealized_pnl: "0", asset_class: "Bond", security_name: "Bad Bond 7% 2029", ticker: "" },
 			},
 			stale: ["SEC-BADBOND"],
 			total_value: "28000.25",
@@ -172,18 +172,22 @@ test("dashboard renders native sections and keeps holdings sortable", async () =
 	}
 
 	// Holdings: stale bond sinks below the priced row under value-desc default.
+	// Rows show the human label (name + ticker), never the raw doc ID.
 	const bodyRows = desk.find("tbody").toArray()[0].children;
-	assert.equal(bodyRows[0].children[0].allText(), "SEC-RELIANCE");
-	assert.equal(bodyRows[1].children[0].allText(), "SEC-BADBOND");
+	assert.equal(bodyRows[0].children[0].allText(), "Reliance Industries (RELIANCE)");
+	assert.equal(bodyRows[1].children[0].allText(), "Bad Bond 7% 2029");
+	// The row link still targets the real Security document.
+	const hrefs = desk.find("a").toArray().map((a) => a.attributes.href || "");
+	assert.ok(hrefs.some((h) => h.includes("SEC-RELIANCE")), "row link keeps the doc ID");
 
-	// Clicking a column header re-sorts (security ascending here).
+	// Clicking a column header re-sorts (security label ascending here).
 	const securityBtn = desk.buttons().find((el) => el.allText().includes("Security"));
 	assert.ok(securityBtn, "sortable Security header");
 	securityBtn.click();
 	await desk.flush();
 	const resorted = desk.find("tbody").toArray()[0].children;
-	assert.equal(resorted[0].children[0].allText(), "SEC-BADBOND");
-	assert.equal(resorted[1].children[0].allText(), "SEC-RELIANCE");
+	assert.equal(resorted[0].children[0].allText(), "Bad Bond 7% 2029");
+	assert.equal(resorted[1].children[0].allText(), "Reliance Industries (RELIANCE)");
 });
 
 test("holdings table keeps value columns for priced rows", async () => {

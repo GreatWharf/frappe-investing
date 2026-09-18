@@ -410,6 +410,11 @@
 				const lastPrice = inv.num(bucket.last_price);
 				return {
 					security,
+					// Human label for display and sorting; the raw ID stays only
+					// for the form link and stale-set membership.
+					label: bucket.security_name
+						? bucket.security_name + (bucket.ticker ? ` (${bucket.ticker})` : "")
+						: bucket.ticker || security,
 					qty,
 					market_value: mv,
 					cost: inv.num(bucket.cost),
@@ -426,7 +431,10 @@
 
 		function sortHoldings(rows) {
 			const { key, dir } = state.sort;
-			const val = (row) => (row[key] === null || row[key] === undefined ? null : row[key]);
+			const val = (row) => {
+				if (key === "security") return row.label; // sort what the user sees
+				return row[key] === null || row[key] === undefined ? null : row[key];
+			};
 			return rows.slice().sort((a, b) => {
 				const va = val(a);
 				const vb = val(b);
@@ -487,7 +495,7 @@
 				const secTd = $("<td>").appendTo(tr2);
 				$("<a>")
 					.attr("href", inv.formUrl("Security", row.security))
-					.text(row.security)
+					.text(row.label)
 					.appendTo(secTd);
 				$("<td>").addClass("inv-num").text(row.qty === null ? "—" : inv.formatQty(row.qty)).appendTo(tr2);
 				const priceTd = $("<td>").addClass("inv-num").appendTo(tr2);

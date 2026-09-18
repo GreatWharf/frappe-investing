@@ -405,11 +405,14 @@ def value_portfolio(portfolio_name, day=None):
             )
         )
     securities = [s for (_a, s) in engine._lots]
-    prices, currencies, classes = {}, {}, {}
+    prices, currencies, classes, labels = {}, {}, {}, {}
     for security in securities:
-        info = frappe.db.get_value("Security", security, ["currency", "asset_class"], as_dict=True)
+        info = frappe.db.get_value(
+            "Security", security, ["currency", "asset_class", "security_name", "ticker"], as_dict=True
+        )
         currencies[security] = info.currency
         classes[security] = info.asset_class
+        labels[security] = (info.security_name or "", info.ticker or "")
         rows = frappe.get_all(
             "Security Price",
             filters={"security": security, "date": ["<=", day]},
@@ -429,6 +432,9 @@ def value_portfolio(portfolio_name, day=None):
         currencies=currencies,
     )
     result["allocation_by_class"] = valuation.allocation(result["by_security"], "asset_class")
+    # Display labels ride along so the UI never has to show raw doc IDs.
+    for security, bucket in result["by_security"].items():
+        bucket["security_name"], bucket["ticker"] = labels.get(security, ("", ""))
     return result
 
 
