@@ -1,8 +1,8 @@
 {
  "doctype": "Page",
- "name": "broker-setup",
- "page_name": "broker-setup",
- "title": "Broker Setup",
+ "name": "investing-dashboard",
+ "page_name": "investing-dashboard",
+ "title": "Investing Dashboard",
  "module": "Investing",
  "standard": "Yes",
  "system_page": 0,

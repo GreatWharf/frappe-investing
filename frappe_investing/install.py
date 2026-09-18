@@ -40,7 +40,7 @@ def _workspace():
             "icon": "chart",
             "roles": [{"role": role} for role in (*USER_ROLES, "System Manager")],
             "shortcuts": [
-                {"label": "Dashboard", "type": "Page", "link_to": "investing"},
+                {"label": "Dashboard", "type": "Page", "link_to": "investing-dashboard"},
                 {"label": "Broker Setup", "type": "Page", "link_to": "broker-setup"},
                 {"label": "Portfolios", "type": "DocType", "link_to": "Portfolio", "doc_view": "List"},
                 {"label": "Securities", "type": "DocType", "link_to": "Security", "doc_view": "List"},

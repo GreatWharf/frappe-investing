@@ -14,7 +14,7 @@ const test = require("node:test");
 const { createDesk, Wrap } = require("./dom-harness.cjs");
 
 const NAMESPACE_JS = "frappe_investing/public/js/investing.js";
-const PAGE_JS = "frappe_investing/investing/page/investing/investing.js";
+const PAGE_JS = "frappe_investing/investing/page/investing_dashboard/investing_dashboard.js";
 const SETUP_JS = "frappe_investing/investing/page/broker_setup/broker_setup.js";
 const FORM_JS = "frappe_investing/investing/doctype/broker_connection/broker_connection.js";
 
@@ -114,7 +114,7 @@ function deskWithDashboard({ roles = ["Investment Manager"], dashboard, extra = 
 
 async function loadDashboardPage(desk) {
 	const wrapper = {};
-	desk.frappe.pages["investing"].on_page_load(wrapper);
+	desk.frappe.pages["investing-dashboard"].on_page_load(wrapper);
 	await desk.flush();
 	return wrapper;
 }

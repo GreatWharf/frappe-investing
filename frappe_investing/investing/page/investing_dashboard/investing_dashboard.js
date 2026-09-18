@@ -1,4 +1,4 @@
-/* Frappe Investing — portfolio dashboard (page route: investing).
+/* Frappe Investing — portfolio dashboard (page route: investing-dashboard).
  *
  * Consumes the frozen API in frappe_investing/api.py (get_dashboard,
  * create_portfolio, record_manual_event, sync_now, refresh_prices,
@@ -117,9 +117,9 @@
 	};
 
 	/* ------------------------------------------------------------ page */
-	frappe.pages["investing"] = frappe.pages["investing"] || {};
+	frappe.pages["investing-dashboard"] = frappe.pages["investing-dashboard"] || {};
 
-	frappe.pages["investing"].on_page_load = function (wrapper) {
+	frappe.pages["investing-dashboard"].on_page_load = function (wrapper) {
 		const page = frappe.ui.make_app_page({
 			parent: wrapper,
 			title: __("Investing"),
@@ -1048,7 +1048,7 @@
 		load();
 	};
 
-	frappe.pages["investing"].on_page_show = function (wrapper) {
+	frappe.pages["investing-dashboard"].on_page_show = function (wrapper) {
 		// on_page_load already kicked off the first load; reload only on
 		// subsequent visits to the cached page.
 		if (wrapper.investing_reload && !wrapper.investing_state.loading) {

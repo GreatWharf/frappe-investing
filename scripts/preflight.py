@@ -197,14 +197,14 @@ def check_doctypes(doctypes, symbols):
 def check_dashboard_calls():
     api = APP / "api.py"
     exposed = whitelisted(api)
-    page_js = MODULE / "page" / "investing" / "investing.js"
+    page_js = MODULE / "page" / "investing_dashboard" / "investing_dashboard.js"
     called = set(re.findall(r'call\(\s*"([a-z_]+)"', page_js.read_text()))
     called |= {
         m.rpartition(".")[2]
         for m in re.findall(r'"(frappe_investing\.api\.[a-z_]+)"', page_js.read_text())
     }
     for name in sorted(called - exposed):
-        fail("page/investing/investing.js", f"calls api.{name}, which is not whitelisted")
+        fail("page/investing_dashboard/investing_dashboard.js", f"calls api.{name}, which is not whitelisted")
 
 
 def check_assets():
