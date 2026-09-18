@@ -40,6 +40,9 @@ TIMEOUT = 10
 # getting the paid tier — costs one subscription rather than a refund and a
 # lost customer. Introducing a cheaper paid tier means naming it here first.
 FREE_PLANS = {"", "free", "trial"}
+# Token sets that are free in any combination: "Free Trial", "Trial Free" and
+# "free-trial" name the free tier twice and must never fail open to paid.
+FREE_TOKENS = {"free", "trial"}
 PLAN_TIERS = {
     "standard": "pro",
     "pro": "pro",
@@ -69,7 +72,17 @@ def normalize_plan(plan):
 def plan_tier(plan):
     """The tier a published plan name maps to. Unknown paid names get PAID_DEFAULT."""
     name = normalize_plan(plan)
-    if name in FREE_PLANS:
+    if not name:
+        return "standard"
+    tokens = set(name.split())
+    if tokens <= FREE_TOKENS:
+        # Every word names the free tier ("Free", "Trial", "Free Trial",
+        # "free-trial"): never fail open to paid.
+        return "standard"
+    if tokens & FREE_TOKENS:
+        # A free word inside a longer name ("Free ACME Corp Add-on") still
+        # names a free-tier subscription; only genuinely unknown names
+        # (no free token at all) fail open to paid.
         return "standard"
     return PLAN_TIERS.get(name, PAID_DEFAULT)
 

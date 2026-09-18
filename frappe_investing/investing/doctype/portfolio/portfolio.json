@@ -38,6 +38,12 @@
       "fieldname": "notes",
       "label": "Notes",
       "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "connections_tab",
+      "fieldtype": "Tab Break",
+      "label": "Connections",
+      "show_dashboard": 1
     }
   ],
   "field_order": [
@@ -45,7 +51,8 @@
     "company",
     "base_currency",
     "cost_method",
-    "notes"
+    "notes",
+    "connections_tab"
   ],
   "permissions": [
     {

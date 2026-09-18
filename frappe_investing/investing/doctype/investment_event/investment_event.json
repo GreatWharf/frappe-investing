@@ -152,6 +152,12 @@
       "fieldtype": "Data"
     },
     {
+      "fieldname": "target_account",
+      "label": "Target Account",
+      "fieldtype": "Link",
+      "options": "Investment Account"
+    },
+    {
       "fieldname": "connection",
       "label": "Broker Connection",
       "fieldtype": "Link",
@@ -225,6 +231,7 @@
     "provenance",
     "source",
     "source_ref",
+    "target_account",
     "connection",
     "dedupe_key",
     "reversal_of",
@@ -238,8 +245,7 @@
       "role": "Investment User",
       "read": 1,
       "create": 1,
-      "write": 1,
-      "submit": 1
+      "write": 1
     },
     {
       "role": "Investment Manager",
@@ -247,6 +253,7 @@
       "create": 1,
       "write": 1,
       "delete": 1,
+      "submit": 1,
       "cancel": 1
     },
     {

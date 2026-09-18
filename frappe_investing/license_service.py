@@ -36,7 +36,15 @@ def _cloud_secret():
 
 
 def _cached_cloud_state(doc):
-    """The last plan read from Frappe Cloud, while it is still inside the grace window."""
+    """The last plan read from Frappe Cloud, while it is still inside the grace window.
+
+    Desk cannot raise the cached tier: cloud_plan is read-only on the form,
+    and every scheduler/refresh read overwrites a hand-edited value with
+    what press actually reports (or clears it when press is unreachable and
+    the grace window has lapsed). Enforcement re-derives the tier from the
+    plan name on each read, so there is no separate stored tier to tamper
+    with — the stored tier column is display-only, rewritten by _persist.
+    """
     checked = doc.get("cloud_checked_at")
     if not doc.get("cloud_plan") or not checked:
         return None
@@ -120,6 +128,10 @@ def require_asset_class(asset_class):
 def portfolio_value_check(total_value, base_currency):
     """Advisory: compare a portfolio value against the license's value cap.
 
+    This check never blocks — it returns a banner payload for the dashboard
+    (or None when within limits). Blocking inserts on a value cap would lock
+    users out of recording their own data after market gains; the
+    asset-class gate above is the enforcing control, this one only advises.
     Returns None when within limits, or a dict describing the breach. A missing
     FX rate fails closed (breach with reason "missing_fx") rather than ignoring
     the cap.

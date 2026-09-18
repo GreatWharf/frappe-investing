@@ -40,5 +40,19 @@ permission_query_conditions = {
     "Portfolio": "frappe_investing.permissions.scoped_query",
     "Broker Connection": "frappe_investing.permissions.scoped_query",
     "Investment Accounting Policy": "frappe_investing.permissions.scoped_query",
+    "Investment Account": "frappe_investing.permissions.child_query",
     "Investment Event": "frappe_investing.permissions.child_query",
+    "Tax Lot": "frappe_investing.permissions.child_query",
+    "Lot Allocation": "frappe_investing.permissions.child_query",
+    "Portfolio Snapshot": "frappe_investing.permissions.child_query",
+    "Broker Sync Log": "frappe_investing.permissions.child_query",
+    "Import Batch": "frappe_investing.permissions.child_query",
 }
+
+fixtures = [
+    {"dt": "Workspace", "filters": [["module", "=", "Investing"]]},
+    {"dt": "Number Card", "filters": [["module", "=", "Investing"]]},
+    {"dt": "Dashboard Chart", "filters": [["module", "=", "Investing"]]},
+    {"dt": "Dashboard Chart Source", "filters": [["module", "=", "Investing"]]},
+    {"dt": "Dashboard", "filters": [["module", "=", "Investing"]]},
+]

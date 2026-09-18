@@ -11,7 +11,8 @@
     {
       "fieldname": "license_key",
       "label": "License Key",
-      "fieldtype": "Long Text"
+      "fieldtype": "Password",
+      "permlevel": 1
     },
     {
       "fieldname": "tier",
@@ -111,8 +112,20 @@
       "delete": 1
     },
     {
+      "role": "System Manager",
+      "read": 1,
+      "permlevel": 1,
+      "write": 1
+    },
+    {
       "role": "Investment Manager",
       "read": 1
+    },
+    {
+      "role": "Investment Manager",
+      "read": 1,
+      "permlevel": 1,
+      "write": 1
     },
     {
       "role": "Investment User",
