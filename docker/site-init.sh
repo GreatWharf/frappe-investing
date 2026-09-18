@@ -172,10 +172,29 @@ log "installed apps on $SITE_NAME:"
 printf '%s\n' "$list_apps_output" | while IFS= read -r line; do log "  $line"; done
 
 # ---------------------------------------------------------------------------
-# 2. Validate the remote target: ERPNext must be installed and >= v16. This
-#    project only builds/tests against ERPNext v16 -- fail closed on
-#    anything else rather than silently proceeding against an unverified
-#    major line.
+# 2a. Cold-boot race guard: this job can reach the site while a separate
+# create-site service is still mid `new-site --install-app erpnext`, in which
+# case list-apps returns empty (frappe/erpnext only appear once their install
+# completes). Wait for erpnext to actually show up instead of failing the
+# gate on a site that is still being built.
+# ---------------------------------------------------------------------------
+APP_WAIT_TIMEOUT="${INVESTING_APP_WAIT_TIMEOUT:-900}"
+waited=0
+until printf '%s\n' "$list_apps_output" | awk '{print $1}' | grep -qx "erpnext"; do
+    if [ "$waited" -ge "$APP_WAIT_TIMEOUT" ]; then
+        break
+    fi
+    log "erpnext not installed on '$SITE_NAME' yet (create-site still running?); waiting (${waited}s/${APP_WAIT_TIMEOUT}s)..."
+    sleep "$SITE_WAIT_INTERVAL"
+    waited=$((waited + SITE_WAIT_INTERVAL))
+    list_apps_output="$(run_bench --site "$SITE_NAME" list-apps 2>&1)" || list_apps_output=""
+done
+
+# ---------------------------------------------------------------------------
+# 2b. Validate the remote target: ERPNext must be installed and v15 or v16.
+# This project only builds/tests against ERPNext v15/v16 -- fail closed on
+# anything else rather than silently proceeding against an unverified
+# major line.
 # ---------------------------------------------------------------------------
 get_major_version() {
     # $1: app name. Prefers the version bench already printed in list-apps
