@@ -55,11 +55,22 @@ def _cached_cloud_state(doc):
     )
 
 
+def _stored_key(doc):
+    """Decrypted license key, or "" when the Password field was never written.
+
+    license_key is a Password field: doc.get() hands back the stored blob,
+    only get_password() decrypts it for evaluate(). But get_password()
+    throws "Password not found" on a fresh single, which would otherwise
+    take down every license check on a brand-new site.
+    """
+    if not doc.get("license_key"):
+        return ""
+    return doc.get_password("license_key") or ""
+
+
 def _resolve(doc):
     """Merge the cached Cloud plan with the stored key, persisting a changed verdict."""
-    # license_key is a Password field: doc.get() hands back the stored blob,
-    # only get_password() decrypts it for evaluate().
-    state = most_generous(_cached_cloud_state(doc), evaluate(doc.get_password("license_key") or ""))
+    state = most_generous(_cached_cloud_state(doc), evaluate(_stored_key(doc)))
     if (state.status, state.tier, state.source) != (doc.status, doc.tier, doc.get("source") or ""):
         _persist(doc, state)
     return state
@@ -218,7 +229,7 @@ def refresh_cloud_subscription():
             _set_cloud(doc, doc.get("cloud_plan") or "", doc.get("cloud_site") or "", str(exc), read=False)
         else:
             _set_cloud(doc, *_read_plan(info), read=True)
-    _persist(doc, most_generous(_cached_cloud_state(doc), evaluate(doc.get_password("license_key") or "")))
+    _persist(doc, most_generous(_cached_cloud_state(doc), evaluate(_stored_key(doc))))
     return public_state()
 
 

@@ -693,6 +693,24 @@ def test_a_cloud_plan_stops_counting_once_the_grace_window_lapses(services):
     assert state.max_asset_classes == 1
 
 
+def test_a_never_saved_license_key_reads_as_free_tier(services, monkeypatch):
+    """Real frappe throws "Password not found" from get_password() when the
+    field was never written (every fresh site). Resolving the tier must not
+    blow up on it — CI benches hit this in all 7 integration tests.
+    """
+    license_mod = _cloud_mod(services, plan="", secret="")
+    doc = services[2]["Investment License"]
+    doc.license_key = None  # Row.__setattr__ writes into the mapping
+
+    def explode(self, field, **kw):
+        raise ValueError("Password not found for Investment License Investment License license_key")
+
+    monkeypatch.setattr(type(doc), "get_password", explode)
+    state = license_mod.current_state()
+    assert state.status == "none"
+    assert state.tier == "standard"
+
+
 def test_resolving_a_tier_never_calls_frappe_cloud(services, monkeypatch):
     from frappe_investing import marketplace
 
