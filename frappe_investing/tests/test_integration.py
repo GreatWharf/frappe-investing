@@ -224,8 +224,28 @@ class TestInvestingIntegration(IntegrationTestCase):
         result = value_portfolio(self.portfolio.name, day="2026-02-01")
         self.assertEqual(float(result["total_value"]), 125.0)
 
+    def _pin_free_tier(self):
+        """Force the free tier for one test, whatever license the site itself holds.
+
+        The two tests below describe free-tier enforcement; on a site with a
+        real pro key saved (the live test site has one), the gate rightly
+        stays open. Key resolution itself is covered by
+        test_license_key_round_trips_and_unlocks_pro.
+        """
+        from unittest import mock
+
+        from frappe_investing import license_service
+        from frappe_investing.licensing import LicenseState
+
+        patcher = mock.patch.object(
+            license_service, "current_state", lambda: LicenseState(status="none", tier="standard")
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_free_tier_blocks_a_second_asset_class(self):
         # The fixture already created a Stock security; the free tier covers 1 class.
+        self._pin_free_tier()
         with self.assertRaises(frappe.PermissionError):
             frappe.get_doc(
                 {
@@ -239,6 +259,7 @@ class TestInvestingIntegration(IntegrationTestCase):
 
     def test_free_tier_allows_more_of_the_same_class(self):
         # Adding another Stock does not grow the class count beyond the limit.
+        self._pin_free_tier()
         frappe.get_doc(
             {
                 "doctype": "Security",
