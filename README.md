@@ -32,8 +32,29 @@ Investing is a comprehensive investment management system for ERPNext. Track sto
 - **Real ERPNext Accounting**: an Investment Accounting Policy maps each event type to your chart of accounts; journal entries post idempotently and cancel with their events.
 - **Fixed Income, Properly**: coupon schedules, accrued interest (30/360, ACT/ACT), clean/dirty prices, yield-to-maturity and redemption at maturity.
 
-## Tiers
+## See It Working
 
+Everything below is the app running on a live ERPNext v16 site after a 13-scenario,
+52-check test fleet drove it end to end. No mockups; the receipts are in
+[Verification](docs/verification.md).
+
+| | |
+|---|---|
+| [![Investing workspace](docs/screenshots/workspace.png)](docs/screenshots/workspace.png) | [![Investing dashboard](docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png) |
+| *The workspace: native Desk navigation, shortcuts and charts.* | *The dashboard: holdings with staleness flags, statement import, broker status.* |
+| [![Broker setup](docs/screenshots/broker-setup.png)](docs/screenshots/broker-setup.png) | [![Investment event](docs/screenshots/event-form.png)](docs/screenshots/event-form.png) |
+| *Four connectors with honest capability badges.* | *Every event links its submitted journal entry.* |
+| [![Journal entries](docs/screenshots/journal-entries.png)](docs/screenshots/journal-entries.png) | [![Statement import](docs/screenshots/import-batches.png)](docs/screenshots/import-batches.png) |
+| *Trades and income land in your chart of accounts.* | *CSV batches dry-run first; nothing posts unreviewed.* |
+
+**Demo videos** (WebM, recorded on the same live site):
+
+- [Record a trade end to end](docs/videos/manual-trade.webm): a manual sell from the
+  dashboard, through its Investment Event, to the submitted Journal Entry.
+- [Import a broker CSV](docs/videos/csv-import.webm): drop a statement, review the
+  preview, post it, and see the batch.
+
+## Tiers
 | | Free | Pro |
 |---|---|---|
 | Every connector, corporate action, tax-lot method, report and the accounting integration | ✓ | ✓ |
