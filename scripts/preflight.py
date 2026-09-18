@@ -262,6 +262,19 @@ def check_fixtures():
             # i.e. on every production install. Dev benches (developer_mode=1)
             # hide this, so it must be caught here.
             fail(f"fixtures/{name}", "Dashboard Chart fixtures must not be is_standard — production installs reject them")
+        if data.get("doctype") == "Dashboard Chart":
+            # Mirror DashboardChart.check_required_field (v16): fixture imports
+            # run validate() in production, so a chart that would not survive
+            # the desk form must fail here instead of mid-migrate.
+            if data.get("chart_type") == "Group By":
+                if not data.get("group_by_based_on"):
+                    fail(f"fixtures/{name}", "Group By chart is missing group_by_based_on")
+                if data.get("group_by_type") in ("Sum", "Average") and not data.get("aggregate_function_based_on"):
+                    fail(f"fixtures/{name}", "Group By Sum/Average chart is missing aggregate_function_based_on")
+            elif data.get("chart_type") in ("Custom", "Report"):
+                pass
+            elif not data.get("based_on"):
+                fail(f"fixtures/{name}", "timeseries chart is missing based_on")
 
 
 def main():

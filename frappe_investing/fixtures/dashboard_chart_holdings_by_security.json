@@ -1,4 +1,5 @@
 {
+ "aggregate_function_based_on": "qty_open",
  "based_on": "security",
  "chart_name": "Holdings by Security",
  "chart_type": "Group By",
@@ -9,7 +10,7 @@
  "document_type": "Tax Lot",
  "dynamic_filters_json": "[]",
  "filters_json": "[[\"Tax Lot\",\"status\",\"=\",\"Open\",false]]",
- "group_by_based_on": "qty_open",
+ "group_by_based_on": "security",
  "group_by_type": "Sum",
  "idx": 0,
  "is_public": 0,
