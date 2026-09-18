@@ -255,6 +255,13 @@ def check_fixtures():
     for name, data in mirrored.items():
         if data.get("module") != "Investing":
             fail(f"fixtures/{name}", "module is not Investing — the fixtures hook would ship another app's doc")
+        if data.get("doctype") == "Dashboard Chart" and data.get("is_standard"):
+            # frappe's fixtures hook calls import_doc(data_import=True), which
+            # does NOT set ignore_validate, and DashboardChart.validate throws
+            # "Cannot edit Standard charts" whenever developer_mode is off —
+            # i.e. on every production install. Dev benches (developer_mode=1)
+            # hide this, so it must be caught here.
+            fail(f"fixtures/{name}", "Dashboard Chart fixtures must not be is_standard — production installs reject them")
 
 
 def main():
