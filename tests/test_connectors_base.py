@@ -88,11 +88,14 @@ def test_content_length_header_short_circuits_large_responses():
     assert err.value.code == "too_large"
 
 
-def test_timeout_and_connection_errors_are_sanitized():
+def test_timeout_and_connection_errors_are_sanitized(monkeypatch):
+    # Timeouts retry with backoff (MAX_RETRIES may re-raise the queued error),
+    # so stub the sleep and queue one transient failure per attempt.
+    monkeypatch.setattr("frappe_investing.connectors.base._sleep_seconds", lambda attempt: None)
     sess = FakeSession()
     sess.raise_next(requests.Timeout(f"timed out reading https://h/x?api_key={SECRET}"))
     with pytest.raises(BrokerError) as err:
-        http_request(sess, "GET", "https://api.kite.trade/x")
+        http_request(sess, "GET", "https://api.kite.trade/x", retries=0)
     assert err.value.code == "timeout"
     assert SECRET not in str(err.value)
 

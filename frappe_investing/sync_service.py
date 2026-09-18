@@ -50,6 +50,9 @@ def sync_connection(name):
     if not lock.acquire(blocking=False):
         raise SyncError("A sync is already running for this connection.")
     log = None
+    log_inserted = False
+    created = {"events": 0, "positions": 0, "prices": 0}
+    ok = False
     try:
         log = frappe.get_doc(
             {
@@ -61,6 +64,7 @@ def sync_connection(name):
         )
         frappe.flags.investing_internal = True
         log.insert(ignore_permissions=True)
+        log_inserted = True
         created = {"events": 0, "positions": 0, "prices": 0}
         connector = connector_for(connection)
         capabilities = connector.capabilities()
@@ -68,48 +72,111 @@ def sync_connection(name):
             positions = connector.positions()
             created["positions"] = len(positions)
             created["prices"] = _store_position_prices(positions, connection)
-        for event in _connector_events(connector, connection, capabilities):
+        events, truncated, cursor = _connector_events(connector, connection, capabilities)
+        for event in events:
             _name, was_created = record_event(_event_to_doc(connection, event))
             created["events"] += int(was_created)
         log.events_created = created["events"]
         log.positions_seen = created["positions"]
         log.prices_seen = created["prices"]
-        log.status = "Success"
+        if truncated:
+            log.status = "Partial"
+            log.error = (
+                f"Source truncated the event window; {created['events']} events recorded, "
+                "re-run syncs the remainder from the saved cursor."
+            )
+        else:
+            log.status = "Success"
+        if cursor and not truncated:
+            # Advance the stream only on a complete run: a truncated run
+            # replays the same window next time, dedupe discarding repeats.
+            frappe.db.set_value("Broker Connection", name, "sync_cursor", cursor)
+        frappe.db.set_value(
+            "Broker Connection",
+            name,
+            {"status": "Connected", "last_sync": now_datetime(), "last_error": ""},
+        )
+        frappe.db.commit()
+        ok = True
     except BrokerError as exc:
         status = "Token Expired" if exc.code in {"token_expired", "unauthorized"} else "Error"
-        frappe.db.set_value("Broker Connection", name, {"status": status, "last_error": str(exc)})
         if log:
             log.error = str(exc)
             log.status = "Failed"
+        frappe.db.rollback()
+        # Re-apply the status AFTER the rollback (which discards the in-batch
+        # set_value) so the connection never stays stuck on Connected.
+        frappe.db.set_value("Broker Connection", name, {"status": status, "last_error": str(exc)})
+        frappe.db.commit()
+        raise
+    except Exception as exc:
+        # Anything else (SyncError, ValidationError, a connector bug) must
+        # still leave a cause on the log and the connection — never a blank
+        # Failed log with a connection stuck on Connected.
+        if log:
+            log.error = str(exc)
+            log.status = "Failed"
+        frappe.db.rollback()
+        frappe.db.set_value("Broker Connection", name, {"status": "Error", "last_error": str(exc)})
+        frappe.db.commit()
         raise
     finally:
-        if log and log.name:
-            frappe.flags.investing_internal = True
-            log.finished_at = now_datetime()
-            log.save(ignore_permissions=True)
-            frappe.flags.investing_internal = False
-        frappe.db.commit()
+        # On failure the rollback above removed the in-flight batch AND the
+        # log row, so re-insert a fresh Failed log instead of saving the dead
+        # row (its UPDATE would hit zero rows and silently change nothing).
         try:
-            lock.release()
-        except Exception:
-            pass
+            if log and log.name:
+                frappe.flags.investing_internal = True
+                log.finished_at = now_datetime()
+                if not ok and log_inserted:
+                    fresh = frappe.get_doc(
+                        {
+                            "doctype": "Broker Sync Log",
+                            "connection": name,
+                            "started_at": log.started_at,
+                            "status": "Failed",
+                            "error": log.error,
+                            "events_created": created["events"],
+                            "finished_at": log.finished_at,
+                        }
+                    )
+                    fresh.insert(ignore_permissions=True)
+                else:
+                    log.save(ignore_permissions=True)
+                frappe.flags.investing_internal = False
+                frappe.db.commit()
+        finally:
+            try:
+                lock.release()
+            except Exception:
+                pass
 
 
 def _connector_events(connector, connection, capabilities):
-    """Dispatch to each connector's real event source. Unknown shapes are reported, not dropped."""
+    """Dispatch to each connector's real event source. Unknown shapes are reported, not dropped.
+
+    Returns (events, truncated, cursor): ``truncated`` when the source capped
+    the window (callers mark the run Partial and keep the old cursor);
+    ``cursor`` advances the stream past this window on complete runs.
+    """
     if connection.broker == "Zerodha":
-        return connector.todays_trades()
+        result = connector.todays_trades()
+        return result["events"], result.get("truncated", False), None
     if connection.broker == "Alpaca":
         result = connector.activities(after=connection.sync_cursor or None)
         for row in result.get("skipped", []):
             frappe.log_error(title=f"Alpaca activity skipped: {connection.name}", message=f"{row}")
-        return result["events"]
+        cursor = None
+        dates = [e.get("date") for e in result.get("events", []) if e.get("date")]
+        if dates:
+            cursor = max(dates)
+        return result["events"], result.get("truncated", False), cursor
     if connection.broker == "Interactive Brokers":
         result = connector.fetch(connection.flex_query_id)
         for row in result.get("errors", []):
             frappe.log_error(title=f"IBKR Flex section not imported: {connection.name}", message=f"{row}")
-        return result["events"]
-    return []
+        return result["events"], result.get("truncated", False), None
+    return [], False, None
 
 
 def _store_position_prices(positions, connection):
@@ -203,6 +270,36 @@ def _resolve_security(security_key, company):
     return name
 
 
+def crypto_gate(feature):
+    """Real tier gate for the CoinGecko adapter: crypto needs a tier upgrade.
+
+    Returns True when the current license already covers a second asset class
+    beyond what is tracked (or is unlimited); False otherwise, so the adapter
+    raises its pro-tier MarketDataError instead of fetching. Any feature flag
+    other than "crypto" fails closed.
+    """
+    if feature != "crypto":
+        return False
+    from . import license_service
+
+    state = license_service.current_state()
+    if state.max_asset_classes is None:
+        return True
+    return len(license_service.used_asset_classes()) < state.max_asset_classes
+
+
+def crypto_holdings_requested():
+    """True when crypto prices are actually needed: an Active Crypto Security
+    carries a provider id, or an open lot/income-relevant holding exists."""
+    rows = frappe.get_all(
+        "Security",
+        filters={"status": "Active", "asset_class": "Crypto", "coingecko_id": ["!=", ""]},
+        fields=["name"],
+        limit_page_length=1,
+    )
+    return bool(rows)
+
+
 def refresh_prices(provider=None, securities=None):
     """Dispatch to the configured market-data provider. Idempotent per security/day."""
     conf = settings()
@@ -212,8 +309,12 @@ def refresh_prices(provider=None, securities=None):
     if provider == "CoinGecko":
         from .license_service import require_asset_class
 
-        require_asset_class("Crypto")  # pricing crypto counts as tracking the class
-        adapter = coingecko.CoinGeckoProvider(gate=lambda feature: True)
+        # Only CoinGecko refreshes that actually touch crypto require the
+        # class: a site tracking one non-crypto class with no crypto
+        # securities or holdings refreshes freely.
+        if crypto_holdings_requested():
+            require_asset_class("Crypto")  # pricing crypto counts as tracking the class
+        adapter = coingecko.CoinGeckoProvider(gate=crypto_gate)
         symbol_field = "coingecko_id"
     elif provider == "Stooq":
         adapter = stooq.StooqProvider()

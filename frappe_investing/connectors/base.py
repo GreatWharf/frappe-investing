@@ -34,6 +34,12 @@ import requests
 DEFAULT_TIMEOUT = 30
 MAX_RESPONSE_BYTES = 20 * 1024 * 1024  # 20 MB
 
+# Bounded retry for transient broker errors: 429s and timeouts are retried
+# with exponential backoff; anything else fails fast.
+RETRYABLE_CODES = frozenset({"rate_limited", "timeout"})
+MAX_RETRIES = 3
+RETRY_BASE_SECONDS = 1.0
+
 CAPABILITY_NAMES = ("accounts", "positions", "trades", "income", "corporate_actions", "history", "quotes")
 
 _STATUS_CODES = {400: "bad_request", 401: "auth", 403: "auth", 404: "not_found", 429: "rate_limited"}
@@ -82,6 +88,15 @@ def _read_capped(response, max_bytes, target):
     return b"".join(chunks)
 
 
+def _sleep_seconds(attempt):
+    """Backoff for retry attempt (1-based): 1s, 2s, 4s. Imported lazily so
+    offline tests can monkeypatch time.sleep without importing this module
+    paying for it at load."""
+    import time
+
+    time.sleep(RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
+
+
 def http_request(
     session,
     method,
@@ -93,47 +108,60 @@ def http_request(
     json_body=None,
     timeout=DEFAULT_TIMEOUT,
     max_bytes=MAX_RESPONSE_BYTES,
+    retries=MAX_RETRIES,
 ):
     """Perform one HTTP request with hard safety limits. Returns the body bytes.
 
     Never raises requests exceptions and never leaks credentials: all
     failures surface as :class:`BrokerError` with a stable ``code`` and a
     message reduced to host, path and status.
+
+    Transient failures (429 rate limits, timeouts) are retried up to
+    ``retries`` times with exponential backoff; anything else fails fast.
     """
     target = _safe_target(url)
-    try:
-        response = session.request(
-            method.upper(),
-            url,
-            headers=headers,
-            params=params,
-            data=data,
-            json=json_body,
-            timeout=timeout,
-            verify=True,
-            stream=True,
-        )
-    except requests.Timeout as exc:
-        raise BrokerError(f"timeout calling {target}", code="timeout") from exc
-    except requests.RequestException as exc:
-        # requests exception messages can embed the full URL (with query string)
-        raise BrokerError(
-            f"network error calling {target} ({type(exc).__name__})", code="network_error"
-        ) from exc
-    try:
-        body = _read_capped(response, max_bytes, target)
-    finally:
-        close = getattr(response, "close", None)
-        if callable(close):
-            close()
-    if response.status_code == 429:
-        raise BrokerError(f"rate limited by {target} (HTTP 429)", code="rate_limited")
-    if response.status_code >= 400:
-        code = _STATUS_CODES.get(
-            response.status_code, "server_error" if response.status_code >= 500 else "http_error"
-        )
-        raise BrokerError(f"HTTP {response.status_code} from {target}", code=code)
-    return body
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            response = session.request(
+                method.upper(),
+                url,
+                headers=headers,
+                params=params,
+                data=data,
+                json=json_body,
+                timeout=timeout,
+                verify=True,
+                stream=True,
+            )
+        except requests.Timeout:
+            err = BrokerError(f"timeout calling {target}", code="timeout")
+        except requests.RequestException as exc:
+            # requests exception messages can embed the full URL (with query string)
+            err = BrokerError(
+                f"network error calling {target} ({type(exc).__name__})", code="network_error"
+            )
+        else:
+            try:
+                body = _read_capped(response, max_bytes, target)
+            finally:
+                close = getattr(response, "close", None)
+                if callable(close):
+                    close()
+            if response.status_code == 429:
+                err = BrokerError(f"rate limited by {target} (HTTP 429)", code="rate_limited")
+            elif response.status_code >= 400:
+                code = _STATUS_CODES.get(
+                    response.status_code,
+                    "server_error" if response.status_code >= 500 else "http_error",
+                )
+                raise BrokerError(f"HTTP {response.status_code} from {target}", code=code)
+            else:
+                return body
+        if err.code not in RETRYABLE_CODES or attempt > retries:
+            raise err
+        _sleep_seconds(attempt)
 
 
 def http_json(session, method, url, **kwargs):

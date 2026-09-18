@@ -110,7 +110,9 @@ def test_todays_trades_emit_buy_sell_events_for_complete_orders_only():
         FakeResponse(200, load_fixture("zerodha_trades_100000000000002.json")),
     )
 
-    events = connector.todays_trades()
+    result = connector.todays_trades()
+    assert result["truncated"] is False
+    events = result["events"]
     assert len(events) == 3
 
     buy = events[0]
@@ -148,7 +150,7 @@ def test_event_dicts_carry_full_normalized_contract_keys():
         "/orders/100000000000002/trades",
         FakeResponse(200, load_fixture("zerodha_trades_100000000000002.json")),
     )
-    for event in connector.todays_trades():
+    for event in connector.todays_trades()["events"]:
         for key in (
             "type",
             "security_key",
@@ -219,3 +221,24 @@ def test_api_errors_are_sanitized_and_never_leak_key_or_secret():
     assert API_SECRET not in str(err.value)
     assert ACCESS_TOKEN not in str(err.value)
     assert err.value.code == "auth"
+
+
+def test_positions_uses_net_rows_not_day_rows():
+    connector, sess = make_connector()
+    sess.add("GET", "/portfolio/positions", FakeResponse(200, load_fixture("zerodha_positions.json")))
+    positions = connector.positions()
+    assert len(positions) == 2
+
+    reliance = positions[0]
+    assert reliance["security_key"] == "NSE:RELIANCE"
+    assert reliance["qty"] == "15"
+    assert reliance["avg_cost"] == "2440.0"
+    assert reliance["currency"] == "INR"
+    assert reliance["market_price"] == "2505.5"
+    assert reliance["as_of"] == date.today().isoformat()
+    assert Decimal(reliance["qty"]) == 15
+
+    tcs = positions[1]
+    assert tcs["security_key"] == "BSE:TCS"
+    assert tcs["qty"] == "8"
+    assert tcs["market_price"] == "3155.0"

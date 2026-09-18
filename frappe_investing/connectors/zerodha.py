@@ -29,6 +29,10 @@ API_BASE = "https://api.kite.trade"
 LOGIN_URL = "https://kite.zerodha.com/connect/login"
 KITE_VERSION = "3"
 
+# Cap on per-order trade fetches per sync: a busy day cannot fan out
+# unboundedly inside one worker job.
+MAX_TRADE_ORDER_FETCHES = 200
+
 
 class ZerodhaConnector(ConnectorBase):
     """Kite Connect v3: token login, holdings, today's orders/trades, instrument master."""
@@ -93,6 +97,30 @@ class ZerodhaConnector(ConnectorBase):
             )
         return positions
 
+    def positions(self):
+        """GET /portfolio/positions -> normalized position dicts (all INR).
+
+        Kite wraps rows in {"net": [...], "day": [...]}; day rows are excluded
+        (zero overnight quantity) and only net rows become positions.
+        """
+        data = self._get_data("/portfolio/positions") or {}
+        rows = data.get("net", []) if isinstance(data, dict) else []
+        positions = []
+        for row in rows:
+            avg_cost = row.get("average_price")
+            last_price = row.get("last_price")
+            positions.append(
+                {
+                    "security_key": f"{row.get('exchange', '')}:{row.get('tradingsymbol', '')}",
+                    "qty": str(row.get("quantity", "0")),
+                    "avg_cost": str(avg_cost) if avg_cost is not None else None,
+                    "currency": "INR",
+                    "market_price": str(last_price) if last_price is not None else None,
+                    "as_of": date.today().isoformat(),
+                }
+            )
+        return positions
+
     def todays_orders(self):
         """GET /orders -> today's orders in a normalized minimal shape (all statuses)."""
         orders = []
@@ -115,11 +143,18 @@ class ZerodhaConnector(ConnectorBase):
 
         Fetches /orders once, then /orders/{order_id}/trades for COMPLETE
         orders only. OPEN/REJECTED orders have no executions and are skipped.
+        Per-order fetches are capped at MAX_TRADE_ORDER_FETCHES; the tail
+        is reported via ``truncated`` so callers never silently drop trades.
         """
         events = []
+        fetched, truncated = 0, False
         for order in self.todays_orders():
             if order["status"] != "COMPLETE":
                 continue
+            if fetched >= MAX_TRADE_ORDER_FETCHES:
+                truncated = True
+                break
+            fetched += 1
             for trade in self._get_data(f"/orders/{order['order_id']}/trades") or []:
                 side = str(trade.get("transaction_type", "")).upper()
                 if side not in {"BUY", "SELL"}:
@@ -139,7 +174,7 @@ class ZerodhaConnector(ConnectorBase):
                         },
                     )
                 )
-        return events
+        return {"events": events, "truncated": truncated, "fetched_orders": fetched}
 
     def instruments(self, exchange):
         """GET /instruments/{exchange} -> parsed instrument master rows for security search."""

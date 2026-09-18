@@ -8,12 +8,16 @@ data row = line 2).
 
 Default column layout (header row required)::
 
-    date,type,security_key,qty,price,amount,gross,fees,taxes,currency,
-    split_ratio,basis_allocation,child_security,child_ratio,notes,source_ref
+    date,type,security_key,qty,price,amount,gross,fees,taxes,withholding,currency,
+    accrued_interest,split_ratio,basis_allocation,child_security,child_ratio,
+    lot_ids,target_currency,target_amount,notes,source_ref
 
-``mapping`` renames incoming headers to these canonical fields ({"Trade
-Date": "date", ...}) so broker exports import without editing the file.
-Columns that do not map to a canonical field are ignored.
+``taxes`` and ``withholding`` are aliases for the same dividend-withholding
+amount: fill exactly one of them (filling both is a row error, so the tax
+is never double-counted). ``mapping`` renames incoming headers to these
+canonical fields ({"Trade Date": "date", ...}) so broker exports import
+without editing the file. Columns that do not map to a canonical field are
+ignored.
 
 * ``date`` is strict YYYY-MM-DD; ``type`` must be a core EVENT_TYPES member.
 * qty/price/amount/gross/fees/taxes stay strings in the output — no float
@@ -46,16 +50,36 @@ DEFAULT_FIELDS = (
     "gross",
     "fees",
     "taxes",
+    "withholding",
     "currency",
+    "accrued_interest",
     "split_ratio",
     "basis_allocation",
     "child_security",
     "child_ratio",
+    "lot_ids",
+    "target_currency",
+    "target_amount",
     "notes",
     "source_ref",
 )
+# taxes and withholding aliasing is enforced inline in _translate (both-filled
+# is a row error); there is no separate mapping table to keep in sync.
 NUMERIC_FIELDS = frozenset(
-    {"qty", "price", "amount", "gross", "fees", "taxes", "split_ratio", "basis_allocation", "child_ratio"}
+    {
+        "qty",
+        "price",
+        "amount",
+        "gross",
+        "fees",
+        "taxes",
+        "withholding",
+        "accrued_interest",
+        "split_ratio",
+        "basis_allocation",
+        "child_ratio",
+        "target_amount",
+    }
 )
 
 
@@ -96,6 +120,13 @@ def _translate(raw, line_no, account, errors):
             fail(f"Field {field} is not a valid decimal: {value!r}")
             return None
         numbers[field] = value
+    # A withholding column aliases taxes: filling one counts as filling both
+    # is an error, so the row is never silently double-counted.
+    if numbers["withholding"] is not None and numbers["taxes"] is not None:
+        fail("Fill only one of taxes / withholding (they are the same withholding amount).")
+        return None
+    if numbers["withholding"] is not None:
+        numbers["taxes"] = numbers["withholding"]
 
     source_ref = raw.get("source_ref", "") or _row_ref(raw)
     event = {
@@ -112,16 +143,24 @@ def _translate(raw, line_no, account, errors):
         "source_ref": source_ref,
         "meta": {"csv_row": line_no},
     }
-    for optional in ("split_ratio", "basis_allocation", "child_ratio"):
+    for optional in ("split_ratio", "basis_allocation", "child_ratio", "accrued_interest", "target_amount"):
         if numbers[optional] is not None:
             event[optional] = numbers[optional]
     if raw.get("child_security"):
         event["child_security"] = raw["child_security"]
+    if raw.get("target_currency"):
+        event["target_currency"] = raw["target_currency"]
+    if raw.get("lot_ids"):
+        event["lot_ids"] = raw["lot_ids"]
     if raw.get("notes"):
         event["notes"] = raw["notes"]
 
     def parsed(field):
         return dec(numbers[field]) if numbers[field] else None
+
+    def parsed_list(field):
+        value = raw.get(field, "")
+        return [part.strip() for part in value.split(",") if part.strip()] or None
 
     try:
         core_events.Event(
@@ -136,10 +175,14 @@ def _translate(raw, line_no, account, errors):
             gross=parsed("gross"),
             fees=dec(event["fees"]),
             taxes=dec(event["taxes"]),
+            accrued_interest=parsed("accrued_interest") or dec(0),
             split_ratio=parsed("split_ratio"),
             basis_allocation=parsed("basis_allocation"),
             child_security=raw.get("child_security") or None,
             child_ratio=parsed("child_ratio"),
+            target_currency=raw.get("target_currency") or None,
+            target_amount=parsed("target_amount"),
+            lot_ids=tuple(parsed_list("lot_ids") or ()),
             source="CSV",
             source_ref=source_ref,
             notes=raw.get("notes", ""),

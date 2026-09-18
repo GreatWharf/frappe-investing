@@ -197,6 +197,8 @@ class AlpacaConnector(ConnectorBase):
         token, pages, truncated = page_token, 0, False
         while True:
             if pages >= MAX_PAGES:
+                # A hit cap means the window may be incomplete: the source was
+                # never asked for the next page, so Partial, never Success.
                 truncated = True
                 break
             params = {"page_size": 100}

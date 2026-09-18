@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "data": {
+    "net": [
+      {
+        "tradingsymbol": "RELIANCE",
+        "exchange": "NSE",
+        "instrument_token": 738561,
+        "product": "MIS",
+        "quantity": 15,
+        "average_price": 2440.0,
+        "last_price": 2505.5,
+        "pnl": 982.5,
+        "day_change": 65.5
+      },
+      {
+        "tradingsymbol": "TCS",
+        "exchange": "BSE",
+        "instrument_token": 2953217,
+        "product": "MIS",
+        "quantity": 8,
+        "average_price": 3110.0,
+        "last_price": 3155.0,
+        "pnl": 360.0,
+        "day_change": 45.0
+      }
+    ],
+    "day": []
+  }
+}
