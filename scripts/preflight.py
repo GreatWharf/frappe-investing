@@ -255,13 +255,15 @@ def check_fixtures():
     for name, data in mirrored.items():
         if data.get("module") != "Investing":
             fail(f"fixtures/{name}", "module is not Investing — the fixtures hook would ship another app's doc")
-        if data.get("doctype") == "Dashboard Chart" and data.get("is_standard"):
+        if data.get("doctype") in {"Dashboard Chart", "Dashboard"} and data.get("is_standard"):
             # frappe's fixtures hook calls import_doc(data_import=True), which
-            # does NOT set ignore_validate, and DashboardChart.validate throws
-            # "Cannot edit Standard charts" whenever developer_mode is off —
+            # does NOT set ignore_validate, and both DashboardChart.validate and
+            # Dashboard.validate throw ("Cannot edit Standard charts" /
+            # "Cannot edit Standard Dashboards") whenever developer_mode is off —
             # i.e. on every production install. Dev benches (developer_mode=1)
-            # hide this, so it must be caught here.
-            fail(f"fixtures/{name}", "Dashboard Chart fixtures must not be is_standard — production installs reject them")
+            # hide this, so it must be caught here. Number Card has no such
+            # guard; Dashboard Chart Source only guards inside a request.
+            fail(f"fixtures/{name}", f"{data['doctype']} fixtures must not be is_standard — production installs reject them")
         if data.get("doctype") == "Dashboard Chart":
             # Mirror DashboardChart.check_required_field (v16): fixture imports
             # run validate() in production, so a chart that would not survive
@@ -275,6 +277,20 @@ def check_fixtures():
                 pass
             elif not data.get("based_on"):
                 fail(f"fixtures/{name}", "timeseries chart is missing based_on")
+        if data.get("doctype") == "Number Card":
+            # Mirror NumberCard.validate (v16): no is_standard guard, but the
+            # required-field checks run on fixture import in production too.
+            card_type = data.get("type")
+            if card_type == "Document Type":
+                if not (data.get("document_type") and data.get("function")):
+                    fail(f"fixtures/{name}", "Document Type card is missing document_type or function")
+                if data.get("function") != "Count" and not data.get("aggregate_function_based_on"):
+                    fail(f"fixtures/{name}", "non-Count card is missing aggregate_function_based_on")
+            elif card_type == "Report":
+                if not (data.get("report_name") and data.get("report_field") and data.get("function")):
+                    fail(f"fixtures/{name}", "Report card is missing report_name, report_field or function")
+            elif card_type == "Custom" and not data.get("method"):
+                fail(f"fixtures/{name}", "Custom card is missing method")
 
 
 def main():
