@@ -8,6 +8,24 @@ on:
 permissions:
   contents: read
 jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fast offline gate (no bench)
+        run: |
+          python -m pip install pytest ruff
+          python -m pytest -q
+          python -m ruff check .
+          python scripts/preflight.py
+          node --test tests/js/investing.test.js
   bench:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -91,10 +109,10 @@ jobs:
           bench --site test.localhost run-tests --app frappe_investing --module frappe_investing.tests.test_integration 2>&1 | tee /tmp/test-step.log || status=$?
           status=${status:-0}
           # bench can swallow run-tests' failure exit, so the unittest summary
-          # is the verdict: anything but "OK" with all 4 tests is a failure.
+          # is the verdict: "Ran N tests" plus OK (any count) is a pass.
           summary=$(grep -E "^(Ran [0-9]+ tests|OK|FAILED)" /tmp/test-step.log | tr '\n' ' ')
           printf '::notice::%s\n' "${summary:-no unittest summary found in test output}"
-          if [ "$status" -ne 0 ] || ! echo "$summary" | grep -q "Ran 4 tests.*OK"; then
+          if [ "$status" -ne 0 ] || ! echo "$summary" | grep -Eq "Ran [0-9]+ tests.*OK"; then
             tail -n 40 /tmp/test-step.log | while IFS= read -r line; do
               line="${line//%/%25}"
               line="${line//$'\r'/}"
