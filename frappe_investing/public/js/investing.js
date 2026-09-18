@@ -121,6 +121,33 @@
 		return `/app/${slug}/${encodeURIComponent(name)}`;
 	};
 
+	// Two-series YTD line data for the portfolio-vs-benchmark chart:
+	// [0%, portfolio TWR] vs [0%, benchmark return], in percent points.
+	// Nulls stay missing — the caller renders the API note instead.
+	inv.benchmarkChartData = function (r) {
+		const pct = (v) => Number((v * 100).toFixed(2));
+		const datasets = [];
+		const twr = inv.num(r.portfolio_twr_ytd);
+		const bench = inv.num(r.benchmark_return_ytd);
+		if (twr !== null) {
+			datasets.push({
+				name: __("This portfolio (TWR, YTD)"),
+				values: [0, pct(twr)],
+			});
+		}
+		if (bench !== null) {
+			datasets.push({
+				name: r.benchmark_name || r.benchmark,
+				values: [0, pct(bench)],
+			});
+		}
+		return {
+			labels: [__("Start"), __("Now")],
+			datasets,
+			yMarkers: [{ label: "0%", value: 0 }],
+		};
+	};
+
 	// Manager gate mirrors the server: Investment Manager or System Manager.
 	inv.isManager = function () {
 		const roles = frappe.user_roles || [];

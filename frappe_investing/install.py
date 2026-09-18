@@ -37,7 +37,7 @@ def _workspace():
             "module": "Investing",
             "public": 1,
             "is_hidden": 0,
-            "icon": "chart-line",
+            "icon": "chart",
             "roles": [{"role": role} for role in (*USER_ROLES, "System Manager")],
             "shortcuts": [
                 {"label": "Dashboard", "type": "Page", "link_to": "investing"},

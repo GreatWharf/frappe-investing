@@ -5,7 +5,7 @@
  * untouched), controls use native .btn / .form-control / .indicator-pill
  * classes, and there is no custom branding, no decorative focus or click
  * rings, and no nested card frames. The classes defined here only cover what
- * Desk has no native component for (KPI grid, allocation bars, tables,
+ * Desk has no native component for (benchmark chart mount, tables,
  * connection rows), styled with theme tokens.
  */
 
@@ -82,43 +82,7 @@
 	margin: 0 0 var(--padding-lg);
 }
 
-/* ---------------------------------------------------------------- KPIs */
-.inv-kpis {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-	gap: var(--padding-md);
-	margin-bottom: var(--padding-lg);
-}
-
-/* Same shape as Desk number cards: card-bg + border, directly on the page. */
-.inv-kpi {
-	background: var(--card-bg);
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius-lg, 12px);
-	padding: var(--padding-md);
-	min-width: 0;
-}
-
-.inv-kpi .inv-kpi-label {
-	font-size: var(--text-sm);
-	color: var(--text-muted);
-	margin-bottom: 6px;
-}
-
-.inv-kpi .inv-kpi-value {
-	font-size: var(--text-xl, 20px);
-	font-weight: 600;
-	font-variant-numeric: tabular-nums;
-	word-break: break-word;
-}
-
-.inv-kpi .inv-kpi-note {
-	font-size: var(--text-xs, 11px);
-	color: var(--text-muted);
-	margin-top: 4px;
-}
-
-/* -------------------------------------------------- signed value hooks */
+/* Signed P&L hooks (emitted via inv.signClass): theme-owned colours only. */
 .inv-pos {
 	color: var(--green-600);
 }
@@ -134,44 +98,6 @@
 /* Status pills use native .indicator-pill classes from JS; the inv-pill /
  * inv-pill-* / inv-badge-stale classes are behaviour/test hooks only and
  * intentionally carry no styling of their own. */
-
-/* ---------------------------------------------------------- allocation */
-.inv-alloc-row {
-	display: grid;
-	grid-template-columns: minmax(90px, 140px) 1fr minmax(56px, auto);
-	align-items: center;
-	gap: var(--padding-sm);
-	margin-bottom: var(--padding-sm);
-}
-
-.inv-alloc-row .inv-alloc-label {
-	font-size: var(--text-sm);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.inv-alloc-row .inv-alloc-pct {
-	font-size: var(--text-sm);
-	font-variant-numeric: tabular-nums;
-	text-align: right;
-	color: var(--text-muted);
-}
-
-/* Same shape as native Desk progress bars; fill is the theme primary. */
-.inv-alloc-track {
-	height: 8px;
-	border-radius: 999px;
-	background: var(--control-bg, var(--bg-light-gray));
-	overflow: hidden;
-}
-
-.inv-alloc-fill {
-	height: 100%;
-	border-radius: 999px;
-	min-width: 2px;
-	background: var(--primary);
-}
 
 /* -------------------------------------------------------------- tables */
 .inv-table-wrap {
@@ -281,43 +207,6 @@ table.inv-table tbody tr:hover {
 	word-break: break-word;
 }
 
-/* ------------------------------------------------------------- license */
-.inv-license .inv-license-tier {
-	font-size: var(--text-lg);
-	font-weight: 600;
-}
-
-.inv-license .inv-license-meta {
-	color: var(--text-muted);
-	font-size: var(--text-sm);
-	margin-top: 4px;
-}
-
-.inv-license .inv-license-actions {
-	margin-top: var(--padding-md);
-}
-
-.inv-warn {
-	margin-top: var(--padding-sm);
-	padding: 8px 12px;
-	border-radius: var(--border-radius);
-	font-size: var(--text-sm);
-	color: var(--yellow-700);
-	background: var(--bg-yellow);
-}
-
-/* Upsell is a plain row — text plus a link, no frame. */
-.inv-upsell {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--padding-sm);
-	flex-wrap: wrap;
-	padding: var(--padding-sm) 0;
-	margin-bottom: var(--padding-lg);
-	font-size: var(--text-sm);
-	color: var(--text-muted);
-}
 
 /* ------------------------------------------------------------- empty */
 /* Native-style empty state: centred text on the page background, no card. */
@@ -364,10 +253,6 @@ table.inv-table tbody tr:hover {
 	min-width: 200px;
 	max-width: 320px;
 	margin-bottom: 0;
-}
-
-table.inv-benchmark-table {
-	max-width: 520px;
 }
 
 .inv-list-plain {
@@ -463,10 +348,6 @@ table.inv-benchmark-table {
 		padding: var(--padding-md) var(--padding-sm) 48px;
 	}
 
-	.inv-kpis {
-		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-	}
-
 	.inv-toolbar .inv-actions {
 		margin-left: 0;
 		width: 100%;
@@ -474,11 +355,6 @@ table.inv-benchmark-table {
 }
 
 @media (max-width: 420px) {
-	.inv-kpis {
-		grid-template-columns: 1fr 1fr;
-		gap: var(--padding-sm);
-	}
-
 	.inv-section {
 		padding: var(--padding-md);
 	}
@@ -491,12 +367,58 @@ table.inv-benchmark-table {
 		justify-content: flex-start;
 	}
 
-	.inv-alloc-row {
-		grid-template-columns: minmax(70px, 100px) 1fr minmax(48px, auto);
-	}
-
 	.inv-toolbar .inv-portfolio-picker select.form-control {
 		min-width: 0;
 		flex: 1;
 	}
+}
+
+/* ------------------------------------------------------ statement import */
+/* Layout only — colours come from Desk tokens so dark mode just works. */
+.inv-import .form-tabs {
+	margin-top: var(--margin-md, 12px);
+}
+
+.inv-import-row {
+	display: flex;
+	align-items: center;
+	gap: var(--margin-sm, 8px);
+	margin-bottom: var(--margin-sm, 8px);
+	flex-wrap: wrap;
+}
+
+.inv-import-row > label {
+	min-width: 140px;
+	margin-bottom: 0;
+}
+
+.inv-import-method-note {
+	flex-basis: 100%;
+	margin: 0;
+}
+
+.inv-dropzone {
+	border: 1px dashed var(--border-color);
+	border-radius: var(--border-radius, 4px);
+	padding: var(--padding-lg, 20px);
+	text-align: center;
+	cursor: pointer;
+	margin: var(--margin-md, 12px) 0;
+}
+
+.inv-dropzone-active {
+	border-style: solid;
+	background: var(--control-bg, var(--bg-light-gray));
+}
+
+.inv-import-file {
+	margin: var(--margin-sm, 8px) 0 0;
+}
+
+.inv-import-preview {
+	margin-top: var(--margin-md, 12px);
+}
+
+.inv-import-summary {
+	font-weight: 600;
 }

@@ -49,6 +49,10 @@ function dashboardFixture() {
 		pending_accounting: [
 			{ name: "EV-0009", event_type: "Dividend", posting_date: "2026-09-15", security: "SEC-RELIANCE" },
 		],
+		accounts: [
+			{ name: "IA-0001", account_name: "Family Main", portfolio: "PF-0001", currency: "INR" },
+			{ name: "IA-0002", account_name: "Trading Main", portfolio: "PF-0002", currency: "INR" },
+		],
 		recent_events: [
 			{ name: "EV-0008", event_type: "Buy", posting_date: "2026-09-14", security: "SEC-RELIANCE", qty: "10", price: "2000", currency: "INR", accounting_status: "Posted" },
 			{ name: "EV-0007", event_type: "Deposit", posting_date: "2026-09-13", security: null, qty: null, price: null, currency: "INR", accounting_status: "Pending" },
@@ -115,15 +119,19 @@ async function loadDashboardPage(desk) {
 	return wrapper;
 }
 
-function kpiCard(desk, label) {
-	const labelEl = desk
-		.find(".inv-kpi-label")
-		.toArray()
-		.find((el) => el.textValue === label);
-	assert.ok(labelEl, `KPI card not found: ${label}`);
-	const card = labelEl.parent;
-	const valueEl = card.children.find((child) => child.classes.has("inv-kpi-value"));
-	return { card, valueEl };
+function installChartSpy(desk, { fail = false } = {}) {
+	const seen = [];
+	const Chart = fail
+		? class { constructor() { throw new Error("no chart"); } }
+		: class { constructor(el, opts) { seen.push({ el, opts }); } };
+	desk.window.Chart = Chart;
+	return seen;
+}
+
+function chartData(inv, r) {
+	// inv.benchmarkChartData runs inside the vm realm, whose Array prototype
+	// differs from this realm's; round-trip before any deep assertion.
+	return JSON.parse(JSON.stringify(inv.benchmarkChartData(r)));
 }
 
 test("namespace utilities escape, format and classify", () => {
@@ -141,35 +149,51 @@ test("namespace utilities escape, format and classify", () => {
 	assert.ok(inv.isManager());
 });
 
-test("dashboard renders KPI cards from the get_dashboard payload", async () => {
+test("dashboard renders native sections and keeps holdings sortable", async () => {
 	const desk = deskWithDashboard();
 	await loadDashboardPage(desk);
 
-	assert.equal(kpiCard(desk, "Portfolio Value").valueEl.textValue, "INR 28,000.25");
-	assert.equal(kpiCard(desk, "YTD TWR").valueEl.textValue, "5.23%");
-	assert.ok(kpiCard(desk, "YTD TWR").valueEl.classes.has("inv-pos"));
-	// XIRR is null in the payload → em dash, no fabricated number.
-	assert.equal(kpiCard(desk, "YTD XIRR").valueEl.textValue, "—");
-	const unrealized = kpiCard(desk, "Unrealized P&L").valueEl;
-	assert.equal(unrealized.textValue, "INR 3,000.25");
-	assert.ok(unrealized.classes.has("inv-pos"));
-	// YTD totals come from performance_summary; they render as money, not dashes.
-	assert.equal(kpiCard(desk, "Realized P&L (YTD)").valueEl.textValue, "INR 1,250.50");
-	assert.equal(kpiCard(desk, "Income (YTD)").valueEl.textValue, "INR 420.00");
+	// KPI grid, allocation bars and the license card are gone: Desk-native
+	// list views own the numbers, so the page keeps only what Desk cannot do.
+	// ("Unrealized P&L" still names a holdings column — the KPI card is gone.)
+	for (const label of ["Portfolio Value", "YTD TWR", "YTD XIRR", "Allocation"]) {
+		assert.ok(!desk.texts().includes(label), `custom section removed: ${label}`);
+	}
+	assert.equal(desk.find(".inv-kpi").length, 0);
+	assert.equal(desk.find(".inv-alloc-fill").length, 0);
+	assert.equal(desk.find(".inv-upsell").length, 0);
 
-	// Allocation bar and the over-tier usage banner (2 classes used, license covers 1).
-	const fill = desk.find(".inv-alloc-fill").get(0);
-	assert.ok(fill, "allocation bar rendered");
-	assert.equal(fill.style.width, "100%");
-	assert.ok(
-		desk.texts().some((t) => /tracks 2 asset classes \(Stock, Bond\); your license covers 1/.test(t)),
-		"over-tier usage banner rendered"
-	);
+	// What stays: picker toolbar, sortable holdings, broker connections.
+	assert.equal(desk.find("#inv-portfolio-select").length, 1);
+	assert.ok(desk.button("Record Event"));
+	const headings = desk.texts();
+	for (const h of ["Holdings", "Broker Connections", "Pending Accounting", "Recent Events"]) {
+		assert.ok(headings.includes(h), `section kept: ${h}`);
+	}
 
 	// Holdings: stale bond sinks below the priced row under value-desc default.
 	const bodyRows = desk.find("tbody").toArray()[0].children;
 	assert.equal(bodyRows[0].children[0].allText(), "SEC-RELIANCE");
 	assert.equal(bodyRows[1].children[0].allText(), "SEC-BADBOND");
+
+	// Clicking a column header re-sorts (security ascending here).
+	const securityBtn = desk.buttons().find((el) => el.allText().includes("Security"));
+	assert.ok(securityBtn, "sortable Security header");
+	securityBtn.click();
+	await desk.flush();
+	const resorted = desk.find("tbody").toArray()[0].children;
+	assert.equal(resorted[0].children[0].allText(), "SEC-BADBOND");
+	assert.equal(resorted[1].children[0].allText(), "SEC-RELIANCE");
+});
+
+test("holdings table keeps value columns for priced rows", async () => {
+	const desk = deskWithDashboard();
+	await loadDashboardPage(desk);
+	const bodyRows = desk.find("tbody").toArray()[0].children;
+	const first = bodyRows[0].children;
+	assert.equal(first[1].textValue, "10"); // qty
+	assert.ok(first[3].textValue.includes("28,000.25"), "market value formatted");
+	assert.ok(first[4].textValue.includes("20,000"), "cost formatted");
 });
 
 test("stale holding shows a Stale badge instead of a price", async () => {
@@ -184,8 +208,9 @@ test("stale holding shows a Stale badge instead of a price", async () => {
 	assert.equal(row.children[5].textValue.includes("0.00"), true); // unrealized P&L is 0, not missing
 });
 
-test("benchmark section lists indexes and compares on selection", async () => {
+test("benchmark selection renders a portfolio-vs-benchmark line chart", async () => {
 	const desk = deskWithDashboard();
+	const charts = installChartSpy(desk);
 	await loadDashboardPage(desk);
 
 	// The picker is populated from benchmark_list with a neutral placeholder first.
@@ -201,27 +226,57 @@ test("benchmark section lists indexes and compares on selection", async () => {
 	assert.ok(desk.texts().some((t) => /Pick an index to compare/.test(t)));
 	assert.equal(desk.callsTo("compare_benchmark").length, 0);
 
-	// Selecting an index calls compare_benchmark and renders the three rows.
+	// Selecting an index calls compare_benchmark and draws the two-series line.
 	selectEl.value = "NIFTY50";
 	selectEl.trigger("change");
 	await desk.flush();
 	assert.equal(desk.callsTo("compare_benchmark").length, 1);
 	assert.equal(desk.callsTo("compare_benchmark")[0].args.benchmark, "NIFTY50");
-	const table = desk.find(".inv-benchmark-table").get(0);
-	assert.ok(table, "comparison table rendered");
-	const text = table.allText();
-	assert.ok(text.includes("Nifty 50 (YTD)"));
-	assert.ok(text.includes("3.10%"), "benchmark return shown");
-	assert.ok(text.includes("This portfolio (TWR, YTD)"));
-	assert.ok(text.includes("5.23%"), "portfolio TWR shown");
-	assert.ok(text.includes("Excess vs benchmark"));
-	assert.ok(text.includes("2.13%"), "excess return shown");
+	assert.equal(charts.length, 1, "one frappe-charts line chart constructed");
+	const chart = charts[0].opts;
+	assert.equal(chart.type, "line");
+	const series = Object.fromEntries(
+		JSON.parse(JSON.stringify(chart.data.datasets)).map((d) => [d.name, d.values])
+	);
+	assert.deepEqual(series["This portfolio (TWR, YTD)"], [0, 5.23]);
+	assert.deepEqual(series["Nifty 50"], [0, 3.1]);
+	assert.ok(desk.texts().some((t) => /Excess vs benchmark: 2.13%/.test(t)));
 
 	// Clearing the selection returns to the hint without a further call.
 	selectEl.value = "";
 	selectEl.trigger("change");
 	await desk.flush();
 	assert.equal(desk.callsTo("compare_benchmark").length, 1, "no call without a selection");
+});
+
+test("benchmark chart builder passes nulls through without fabricating", () => {
+	const desk = deskWithDashboard();
+	const inv = desk.frappe.investing;
+	assert.ok(typeof inv.benchmarkChartData === "function");
+	const full = chartData(inv, {
+		benchmark: "NIFTY50", benchmark_name: "Nifty 50",
+		portfolio_twr_ytd: "0.0523", benchmark_return_ytd: "0.0310",
+	});
+	assert.equal(full.datasets.length, 2);
+	const partial = chartData(inv, {
+		benchmark: "SP500", benchmark_name: "S&P 500",
+		portfolio_twr_ytd: "0.0523", benchmark_return_ytd: null,
+	});
+	assert.equal(partial.datasets.length, 1, "missing benchmark series stays missing");
+	assert.deepEqual(partial.datasets[0].values, [0, 5.23]);
+});
+
+test("benchmark chart failure degrades to a message, not a blank page", async () => {
+	const desk = deskWithDashboard();
+	installChartSpy(desk, { fail: true });
+	await loadDashboardPage(desk);
+	const selectEl = desk.find("select").toArray().find((el) =>
+		el.descendants().some((d) => d.tag === "option" && d.textValue === "Nifty 50")
+	);
+	selectEl.value = "NIFTY50";
+	selectEl.trigger("change");
+	await desk.flush();
+	assert.ok(desk.texts().some((t) => /could not be rendered/.test(t)));
 });
 
 test("benchmark note renders when index prices are missing", async () => {
@@ -252,89 +307,23 @@ test("benchmark note renders when index prices are missing", async () => {
 		desk.texts().some((t) => /No stored prices for S&P 500/.test(t)),
 		"missing-prices note shown instead of a fabricated number"
 	);
+	assert.equal(desk.find(".inv-benchmark-chart").length, 0, "no chart without benchmark data");
 });
 
-test("license dialog is gated to managers", async () => {
+test("toolbar actions stay gated while license chrome is gone", async () => {
 	const user = deskWithDashboard({ roles: ["Investment User"] });
 	await loadDashboardPage(user);
-	assert.equal(user.button("Enter License Key"), null);
 	assert.ok(user.button("Record Event"), "users keep the Record Event action");
 	assert.equal(user.button("Refresh Prices"), null);
 	assert.equal(user.button("Sync Now"), null, "sync is manager-only server-side");
+	assert.equal(user.button("Enter License Key"), null, "license chrome removed");
+	assert.equal(user.find(".inv-license").length, 0, "no license section");
 
-	const manager = deskWithDashboard({
-		extra: { "frappe_investing.api.save_license": (args) => ({ message: { tier: "pro", status: "active", ...args } }) },
-	});
+	const manager = deskWithDashboard();
 	await loadDashboardPage(manager);
-	const button = manager.button("Enter License Key");
-	assert.ok(button, "manager sees the license action");
-	button.click();
-	const dialog = manager.lastDialog();
-	assert.equal(dialog.title, "Enter License Key");
-	dialog.set_value("license_key", "FINV1.payload.sig");
-	await dialog.primary();
-	await manager.flush();
-	const save = manager.callsTo("save_license");
-	assert.equal(save.length, 1);
-	assert.equal(save[0].args.license_key, "FINV1.payload.sig");
-});
-
-test("a Frappe Cloud plan shows its own name and needs no license key", async () => {
-	const data = dashboardFixture();
-	data.license = {
-		tier: "pro", status: "active", source: "cloud", customer: "acme.frappe.cloud",
-		expires: "", max_asset_classes: null, max_value: null, value_currency: null,
-		cloud_managed: true, cloud_plan: "Pro", cloud_site: "acme.frappe.cloud", cloud_note: "",
-	};
-	const desk = deskWithDashboard({
-		dashboard: data,
-		extra: { "frappe_investing.api.refresh_license": () => ({ message: data.license }) },
-	});
-	await loadDashboardPage(desk);
-	assert.ok(
-		desk.texts().some((t) => /From your Frappe Cloud plan Pro/.test(t)),
-		"the card names the plan the tier came from",
-	);
-	assert.ok(
-		desk.texts().some((t) => /Covers unlimited asset classes/.test(t)),
-		"the one paid plan covers everything",
-	);
-	assert.ok(
-		!desk.texts().some((t) => /Licensed to/.test(t)),
-		"a Cloud site is never described as key-licensed",
-	);
-
-	const refresh = desk.button("Refresh Plan");
-	assert.ok(refresh, "a Cloud site can re-read its plan on demand");
-	refresh.click();
-	await desk.flush();
-	assert.equal(desk.callsTo("refresh_license").length, 1);
-});
-
-test("a lapsed Cloud subscription says so and points at the Frappe Cloud dashboard", async () => {
-	const data = dashboardFixture();
-	data.license = {
-		tier: "standard", status: "none", source: "none", customer: "", expires: "",
-		max_asset_classes: 1, max_value: null, value_currency: null,
-		cloud_managed: true, cloud_plan: "",
-		cloud_site: "acme.frappe.cloud",
-		cloud_note: "Your Frappe Cloud subscription is not active.",
-	};
-	const desk = deskWithDashboard({ dashboard: data });
-	await loadDashboardPage(desk);
-	assert.ok(desk.texts().some((t) => /subscription is not active/.test(t)));
-	assert.ok(
-		desk.texts().some((t) => /Choose a paid plan in Frappe Cloud/.test(t)),
-		"a Cloud site is pointed at its dashboard, not at a license key",
-	);
-});
-
-test("a self-hosted site is offered a key and no plan refresh", async () => {
-	const desk = deskWithDashboard();
-	await loadDashboardPage(desk);
-	assert.equal(desk.button("Refresh Plan"), null, "no plan to refresh without a subscription");
-	assert.ok(desk.button("Enter License Key"), "the key is the self-hosted path");
-	assert.ok(desk.texts().some((t) => /Enter a license key to track more asset classes/.test(t)));
+	assert.ok(manager.button("Record Event"));
+	assert.ok(manager.button("Refresh Prices"), "managers keep price refresh");
+	assert.ok(manager.button("Sync Now"), "managers keep per-connection sync");
 });
 
 test("event dialog adapts visible fields to the event type", async () => {
@@ -424,6 +413,25 @@ test("Sync Now disables while the call is in flight and ignores repeat clicks", 
 	assert.equal(desk.timers.count(), 1, "status poll interval started after queueing");
 });
 
+test("Sync Now reports honestly when the job was deduplicated away", async () => {
+	const desk = deskWithDashboard({
+		extra: {
+			"frappe_investing.api.sync_now": () => ({
+				message: { queued: false, note: "A sync for this connection is already queued or running." },
+			}),
+		},
+	});
+	await loadDashboardPage(desk);
+	const button = desk.buttons().find((el) => el.attributes["aria-label"] === "Sync Now Zerodha Main");
+	button.click();
+	await desk.flush();
+	assert.ok(
+		desk.recorded.alerts.some((a) => /already queued or running/.test(a.message)),
+		"dedup note shown instead of a false queued confirmation"
+	);
+	assert.equal(desk.timers.count(), 1, "poll still starts to watch the running sync");
+});
+
 test("post-sync poll reloads the dashboard when the connection status changes", async () => {
 	const desk = deskWithDashboard({
 		extra: {
@@ -482,7 +490,7 @@ test("empty state renders the setup CTA and creates a portfolio", async () => {
 	await loadDashboardPage(desk);
 	assert.ok(desk.button("Create Portfolio"), "setup CTA visible to a manager");
 	assert.ok(desk.button("Open Broker Setup"), "link to the guided connector page");
-	assert.ok(desk.texts().some((t) => /Free tier/.test(t)), "license card still renders");
+	assert.equal(desk.find(".inv-license").length, 0, "no license chrome on the empty state");
 
 	desk.button("Create Portfolio").click();
 	const dialog = desk.lastDialog();
@@ -675,4 +683,155 @@ test("broker connection buttons, dirty guard and honest headline", () => {
 	assert.ok(!alpaca.buttons.some((b) => b.label === "Connect"));
 	assert.ok(!alpaca.buttons.some((b) => b.label === "Sync Now"));
 	assert.ok(/bad key/.test(alpaca.headlines[0].message));
+});
+
+/* ------------------------------------------------- statement import tabs */
+
+function importTabLink(desk, label) {
+	return desk.find("a").toArray().find((el) => el.allText() === label) || null;
+}
+
+const IMPORT_REFERENCE = [
+	{ type: "Buy", required: ["security_key", "qty", "price"], optional: ["fees"] },
+	{ type: "Dividend", required: ["security_key", "gross"], optional: ["taxes / withholding"] },
+	{ type: "FX Conversion", required: ["amount", "target_currency", "target_amount"], optional: [] },
+];
+
+function deskWithImport({ preview, postResult, costMethod } = {}) {
+	const desk = deskWithDashboard({
+		extra: {
+			"frappe_investing.api.import_reference": () => ({ message: { event_types: clone(IMPORT_REFERENCE) } }),
+			"frappe_investing.api.import_template_url": () => ({
+				message: { url: "/assets/frappe_investing/csv/statement_template.csv" },
+			}),
+			"frappe_investing.api.import_cost_method": () => ({
+				message: costMethod || { portfolio: "PF-0001", portfolio_cost_method: "FIFO", effective: "FIFO" },
+			}),
+			"frappe_investing.api.import_preview": () => ({ message: clone(preview) }),
+			"frappe_investing.api.import_post": () => ({ message: clone(postResult) }),
+		},
+	});
+	desk.window.FileReader = class {
+		readAsText() { this.onload({ target: { result: "" } }); }
+	};
+	return desk;
+}
+
+const GOOD_PREVIEW = {
+	account: "IA-0001",
+	total_rows: 2,
+	valid_rows: 2,
+	error_rows: 0,
+	by_type: { Buy: 1, Dividend: 1 },
+	events: [],
+	errors: [],
+	batch: null,
+};
+
+const BAD_PREVIEW = {
+	account: "IA-0001",
+	total_rows: 2,
+	valid_rows: 1,
+	error_rows: 1,
+	by_type: { Buy: 1 },
+	events: [],
+	errors: [{ row: 3, message: "Invalid date '2026-13-40' (want YYYY-MM-DD)" }],
+	batch: "IMP-0001",
+};
+
+test("statement import section renders two tabs with the import tab active", async () => {
+	const desk = deskWithImport();
+	await loadDashboardPage(desk);
+	const headings = desk.texts();
+	assert.ok(headings.includes("Statement Import"), "import section after holdings");
+	assert.ok(importTabLink(desk, "Import Statement"), "tab 1");
+	assert.ok(importTabLink(desk, "Supported Operations"), "tab 2");
+	// Import tab active by default: account picker + dropzone visible.
+	assert.equal(desk.find("#inv-import-account").length, 1);
+	assert.ok(desk.find(".inv-dropzone").length >= 1);
+	assert.ok(desk.button("Download CSV Template"));
+});
+
+test("import tab is portfolio-aware and surfaces the cost method", async () => {
+	const desk = deskWithImport({
+		costMethod: { portfolio: "PF-0001", portfolio_cost_method: null, effective: "AVERAGE" },
+	});
+	await loadDashboardPage(desk);
+	// Only this portfolio's accounts are offered.
+	const options = desk.find("#inv-import-account").get(0).descendants()
+		.filter((d) => d.tag === "option")
+		.map((d) => d.attributes.value);
+	assert.deepEqual(options, ["IA-0001"]);
+	await desk.flush();
+	const costCalls = desk.callsTo("import_cost_method");
+	assert.equal(costCalls.length, 1);
+	assert.equal(costCalls[0].args.account, "IA-0001");
+	assert.ok(desk.texts().some((t) => /default AVERAGE/.test(t)), "default-method note documents the selector");
+});
+
+test("template download opens the app-served CSV", async () => {
+	const desk = deskWithImport();
+	await loadDashboardPage(desk);
+	desk.button("Download CSV Template").click();
+	await desk.flush();
+	assert.equal(desk.callsTo("import_template_url").length, 1);
+	assert.equal(desk.recorded.openedWindows.length, 1);
+	assert.equal(
+		desk.recorded.openedWindows[0].url,
+		"/assets/frappe_investing/csv/statement_template.csv"
+	);
+});
+
+test("clean preview shows counts and posts through import_post", async () => {
+	const desk = deskWithImport({
+		preview: GOOD_PREVIEW,
+		postResult: { account: "IA-0001", posted: 2, created: 2, errors: [] },
+	});
+	const wrapper = await loadDashboardPage(desk);
+	// Simulate a chosen file: FileReader feeds importText, then the pane
+	// re-renders and the preview call runs.
+	wrapper.investing_state.importText = "date,type\n2026-01-15,Buy";
+	wrapper.investing_state.importFileName = "stmt.csv";
+	wrapper.investing_reload();
+	await desk.flush();
+	const previews = desk.callsTo("import_preview");
+	assert.equal(previews.length, 1);
+	assert.equal(previews[0].args.account, "IA-0001");
+	assert.ok(desk.texts().some((t) => /2 rows: 2 valid, 0 with errors/.test(t)), "preview counts shown");
+	assert.ok(desk.button("Post 2 Events"), "post CTA appears only on a clean preview");
+
+	desk.button("Post 2 Events").click();
+	await desk.flush();
+	const posts = desk.callsTo("import_post");
+	assert.equal(posts.length, 1);
+	assert.equal(posts[0].args.account, "IA-0001");
+	assert.ok(desk.recorded.alerts.some((a) => /Posted 2 events/.test(a.message)));
+	assert.equal(desk.callsTo("get_dashboard").length, 3, "dashboard reloaded after posting");
+});
+
+test("error preview lists per-row errors and offers no post button", async () => {
+	const desk = deskWithImport({ preview: BAD_PREVIEW });
+	const wrapper = await loadDashboardPage(desk);
+	wrapper.investing_state.importText = "date,type\n2026-13-40,Buy";
+	wrapper.investing_reload();
+	await desk.flush();
+	assert.equal(desk.callsTo("import_preview").length, 1);
+	assert.ok(desk.texts().some((t) => /2 rows: 1 valid, 1 with errors/.test(t)));
+	assert.ok(desk.texts().some((t) => /2026-13-40/.test(t)), "row error message shown");
+	assert.ok(desk.texts().some((t) => /IMP-0001/.test(t)), "batch link for the failed preview");
+	assert.equal(desk.button("Post 1 Events"), null, "no post CTA while errors remain");
+	assert.equal(desk.callsTo("import_post").length, 0, "nothing posted");
+});
+
+test("reference tab switches panes and lists required columns per operation", async () => {
+	const desk = deskWithImport();
+	await loadDashboardPage(desk);
+	assert.equal(desk.callsTo("import_reference").length, 1, "reference loads with the section");
+	importTabLink(desk, "Supported Operations").click();
+	await desk.flush();
+	assert.ok(desk.texts().some((t) => /taxes \/ withholding/.test(t)), "dividend withholding documented");
+	assert.ok(desk.texts().some((t) => /target_currency/.test(t)), "FX legs documented");
+	importTabLink(desk, "Import Statement").click();
+	await desk.flush();
+	assert.equal(desk.find("#inv-import-account").length, 1, "switching back restores the import pane");
 });

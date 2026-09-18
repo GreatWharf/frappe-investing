@@ -1,0 +1,301 @@
+{
+ "charts": [
+  {
+   "chart_name": "Portfolio Value",
+   "label": "Portfolio Value"
+  }
+ ],
+ "content": "[{\"id\": \"pVf7Qx2Km9A\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Portfolio Value\", \"col\": 12}}, {\"id\": \"hY0uRShrtc8\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Your Shortcuts</b></span>\", \"col\": 12}}, {\"id\": \"sPtf0102Aa\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Portfolio\", \"col\": 3}}, {\"id\": \"sAcct0304Bb\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Investment Account\", \"col\": 3}}, {\"id\": \"sSec0506Cc\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Security\", \"col\": 3}}, {\"id\": \"sDb0708Dd\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Dashboard\", \"col\": 3}}, {\"id\": \"sSp0910Ee\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hRpMsTr111\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Reports &amp; Masters</b></span>\", \"col\": 12}}, {\"id\": \"cPtf1213Ff\", \"type\": \"card\", \"data\": {\"card_name\": \"Portfolios\", \"col\": 4}}, {\"id\": \"cAcct1415Gg\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounts & Holdings\", \"col\": 4}}, {\"id\": \"cSec1617Hh\", \"type\": \"card\", \"data\": {\"card_name\": \"Securities & Prices\", \"col\": 4}}, {\"id\": \"cBrk1819Ii\", \"type\": \"card\", \"data\": {\"card_name\": \"Broker & Sync\", \"col\": 4}}, {\"id\": \"cAcc2021Jj\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounting\", \"col\": 4}}]",
+ "creation": "2026-09-17 10:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "chart",
+ "idx": 1,
+ "indicator_color": "",
+ "is_hidden": 0,
+ "label": "Investing",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Portfolios",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Portfolio",
+   "link_count": 0,
+   "link_to": "Portfolio",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Portfolio Holding",
+   "link_count": 0,
+   "link_to": "Portfolio Holding",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Portfolio Snapshot",
+   "link_count": 0,
+   "link_to": "Portfolio Snapshot",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Accounts & Holdings",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Investment Account",
+   "link_count": 0,
+   "link_to": "Investment Account",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tax Lot",
+   "link_count": 0,
+   "link_to": "Tax Lot",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Lot Allocation",
+   "link_count": 0,
+   "link_to": "Lot Allocation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Securities & Prices",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Security",
+   "link_count": 0,
+   "link_to": "Security",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Security Price",
+   "link_count": 0,
+   "link_to": "Security Price",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Exchange",
+   "link_count": 0,
+   "link_to": "Exchange",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "FX Rate",
+   "link_count": 0,
+   "link_to": "FX Rate",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Broker & Sync",
+   "link_count": 5,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Broker Connection",
+   "link_count": 0,
+   "link_to": "Broker Connection",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Broker Sync Log",
+   "link_count": 0,
+   "link_to": "Broker Sync Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Import Batch",
+   "link_count": 0,
+   "link_to": "Import Batch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Import Error",
+   "link_count": 0,
+   "link_to": "Import Error",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Investment Event",
+   "link_count": 0,
+   "link_to": "Investment Event",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Accounting",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Investment Accounting Policy",
+   "link_count": 0,
+   "link_to": "Investment Accounting Policy",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Policy Mapping",
+   "link_count": 0,
+   "link_to": "Policy Mapping",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Investment Settings",
+   "link_count": 0,
+   "link_to": "Investment Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Investment License",
+   "link_count": 0,
+   "link_to": "Investment License",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-17 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Investing",
+ "name": "Investing",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [
+  {
+   "role": "Investment Manager"
+  },
+  {
+   "role": "Investment User"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 1.0,
+ "shortcuts": [
+  {
+   "doc_view": "List",
+   "label": "Portfolio",
+   "link_to": "Portfolio",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "Investment Account",
+   "link_to": "Investment Account",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "Security",
+   "link_to": "Security",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "",
+   "label": "Dashboard",
+   "link_to": "investing",
+   "type": "Page"
+  }
+ ],
+ "title": "Investing"
+}

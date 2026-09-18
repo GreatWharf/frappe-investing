@@ -1,0 +1,22 @@
+{
+ "creation": "2026-09-17 10:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "dynamic_filters_json": "[]",
+ "filters_json": "[]",
+ "function": "Sum",
+ "idx": 0,
+ "is_public": 0,
+ "is_standard": 1,
+ "label": "TWR YTD",
+ "method": "frappe_investing.api.portfolio_twr_ytd",
+ "modified": "2026-09-17 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Investing",
+ "name": "TWR YTD",
+ "owner": "Administrator",
+ "report_function": "Sum",
+ "show_full_number": 0,
+ "show_percentage_stats": 0,
+ "type": "Method"
+}

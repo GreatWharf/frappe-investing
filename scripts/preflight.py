@@ -64,7 +64,7 @@ def module_symbols():
             continue
         names = set()
         for node in tree.body:
-            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 names.add(node.name)
             elif isinstance(node, ast.Assign):
                 names.update(t.id for t in node.targets if isinstance(t, ast.Name))
@@ -77,7 +77,7 @@ def whitelisted(path):
     tree = ast.parse(path.read_text(), filename=str(path))
     found = set()
     for node in tree.body:
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         for dec in node.decorator_list:
             call = dec.func if isinstance(dec, ast.Call) else dec
@@ -213,6 +213,50 @@ def check_assets():
             fail("hooks.py", f"public/{asset} is referenced but missing")
 
 
+# ------------------------------------------------------------------ fixtures
+def check_fixtures():
+    """Native cards/charts only ship if they import on install AND migrate.
+
+    frappe's sync_for() walks IMPORTABLE_DOCTYPES per module dir (workspace and
+    dashboard_chart_source included; number_card/dashboard_chart/dashboard are
+    NOT), while sync_dashboards() looks up "dashboard chart"/"number card"
+    with spaces — but apps ship underscore dirs, so on v15 those never import.
+    The version-proof path is frappe_investing/fixtures/*.json via the fixtures
+    hook (sync_fixtures on every migrate). Every native card/chart/dashboard in
+    the module dirs must therefore be mirrored there, and everything mirrored
+    must parse with module Investing.
+    """
+    mirrored = {}
+    for path in (APP / "fixtures").glob("*.json"):
+        try:
+            mirrored[path.name] = json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            fail(f"fixtures/{path.name}", f"invalid JSON: {exc}")
+    for sub in ("number_card", "dashboard_chart", "investing_dashboard"):
+        for path in (MODULE / sub).glob("*/*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except json.JSONDecodeError as exc:
+                fail(str(path.relative_to(ROOT)), f"invalid JSON: {exc}")
+                continue
+            if data.get("module") != "Investing":
+                continue
+            if data.get("doctype") not in {"Number Card", "Dashboard Chart", "Dashboard"}:
+                continue
+            name = f"{data['doctype'].lower().replace(' ', '_')}_{path.parent.name}.json"
+            if name not in mirrored:
+                fail(
+                    str(path.relative_to(ROOT)),
+                    f"not mirrored in fixtures/{name} — it would never import "
+                    "(sync_for skips this doctype, sync_dashboards wants space-named dirs)",
+                )
+            elif mirrored[name] != data:
+                fail(f"fixtures/{name}", "drifted from the module-dir source — re-mirror it")
+    for name, data in mirrored.items():
+        if data.get("module") != "Investing":
+            fail(f"fixtures/{name}", "module is not Investing — the fixtures hook would ship another app's doc")
+
+
 def main():
     symbols = module_symbols()
     doctypes = load_doctypes()
@@ -221,6 +265,7 @@ def main():
     check_doctypes(doctypes, symbols)
     check_dashboard_calls()
     check_assets()
+    check_fixtures()
     if problems:
         print(f"{len(problems)} problem(s) would break the install:\n")
         for problem in problems:

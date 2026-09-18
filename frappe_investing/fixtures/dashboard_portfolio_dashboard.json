@@ -1,0 +1,46 @@
+{
+ "cards": [
+  {
+   "card": "Portfolio Value"
+  },
+  {
+   "card": "Unrealized P&L"
+  },
+  {
+   "card": "Realized P&L YTD"
+  },
+  {
+   "card": "Income YTD"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "Portfolio Value",
+   "width": "Half"
+  },
+  {
+   "chart": "Investment Events",
+   "width": "Half"
+  },
+  {
+   "chart": "Holdings by Security",
+   "width": "Half"
+  },
+  {
+   "chart": "Portfolio Allocation",
+   "width": "Half"
+  }
+ ],
+ "creation": "2026-09-17 10:00:00.000000",
+ "dashboard_name": "Portfolio Dashboard",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2026-09-17 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Investing",
+ "name": "Portfolio Dashboard",
+ "owner": "Administrator"
+}

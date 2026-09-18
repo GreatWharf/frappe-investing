@@ -1,10 +1,10 @@
 /* Frappe Investing — portfolio dashboard (page route: investing).
  *
  * Consumes the frozen API in frappe_investing/api.py (get_dashboard,
- * create_portfolio, record_manual_event, save_license, refresh_license,
- * sync_now, refresh_prices). All rendering goes through jQuery .text() so dynamic
- * strings are never injected as HTML; signed values are colour-coded purely
- * through CSS classes.
+ * create_portfolio, record_manual_event, sync_now, refresh_prices,
+ * benchmark_list, compare_benchmark). All rendering goes through jQuery
+ * .text() so dynamic strings are never injected as HTML; the benchmark
+ * chart uses frappe-charts (bundled with Desk, no extra dependency).
  */
 (() => {
 	const inv = (frappe.investing = frappe.investing || {});
@@ -32,7 +32,7 @@
 		"Deposit": { amount: 1 },
 		"Withdrawal": { amount: 1 },
 		"Transfer In": { security: 1, qty: 1 },
-		"Transfer Out": { security: 1, qty: 1 },
+		"Transfer Out": { security: 1, qty: 1, target_account: 1 },
 		"Split": { security: 1, split_ratio: 1 },
 		"Reverse Split": { security: 1, split_ratio: 1 },
 		"Stock Dividend": { security: 1, split_ratio: 1 },
@@ -45,7 +45,7 @@
 	const EXTRA_FIELDNAMES = [
 		"security", "qty", "price", "amount", "gross", "fees", "taxes",
 		"split_ratio", "child_security", "basis_allocation", "child_ratio",
-		"target_currency", "target_amount",
+		"target_currency", "target_amount", "target_account",
 	];
 
 	inv.eventTypes = EVENT_TYPES.slice();
@@ -101,6 +101,11 @@
 		if (type === "FX Conversion") {
 			need(!!values.target_currency, __("FX Conversion requires a target currency."));
 			need(positive(values.target_amount), __("FX Conversion requires a target amount."));
+		}
+		if (type === "Transfer Out") {
+			need(!!values.target_account, __("Transfer Out requires a target account."));
+			need(values.target_account !== values.account,
+				__("Transfer Out target must differ from the source account."));
 		}
 		// Optional numeric fields must be numbers when present.
 		for (const f of ["fees", "taxes"]) {
@@ -179,19 +184,62 @@
 			if (!data) return;
 			if (data.needs_setup) {
 				renderEmpty(data);
-				renderLicense(data, root);
 				return;
 			}
 			renderToolbar(data);
-			renderKpis(data);
-			renderUsage(data);
-			renderBenchmark(data);
-			renderAllocation(data);
+			renderBenchmark();
 			renderHoldings(data);
+			renderStatementImport(data);
 			renderConnections(data);
 			renderPending(data);
 			renderRecent(data);
-			renderLicense(data, root);
+		}
+
+		/* ---------------------------------------- statement CSV import
+		 * Two tabs, Desk-native (.form-tabs / .nav-tabs): tab 1 is the
+		 * drag-and-drop statement importer (portfolio-aware via the account
+		 * picker, with the cost-method selector surfaced before posting);
+		 * tab 2 is the supported-operations reference (every event type with
+		 * its required columns, served by import_reference so docs and the
+		 * server validator cannot drift).
+		 */
+		function renderStatementImport(data) {
+			const section = $('<section class="inv-section inv-import"></section>').appendTo(root);
+			$("<h2>").text(__("Statement Import")).appendTo(section);
+			$('<p class="inv-section-sub">')
+				.text(__("Import a broker statement CSV into the picked account. Nothing posts until you review the preview."))
+				.appendTo(section);
+			const tabs = $('<div class="form-tabs">').appendTo(section);
+			const nav = $('<ul class="nav nav-tabs" role="tablist">').appendTo(tabs);
+			const panes = $('<div class="tab-content">').appendTo(tabs);
+			const importTab = { id: "inv-import-tab", label: __("Import Statement") };
+			const refTab = { id: "inv-reference-tab", label: __("Supported Operations") };
+			[state.importTab, state.refTab] = [importTab.id, refTab.id];
+			const navItems = [];
+			for (const tab of [importTab, refTab]) {
+				const li = $('<li role="presentation">').appendTo(nav);
+				const link = $('<a role="tab">')
+					.attr("href", `#${tab.id}`)
+					.attr("aria-controls", tab.id)
+					.text(tab.label)
+					.on("click", (e) => {
+						e.preventDefault();
+						state.activeImportTab = tab.id;
+						nav.find("li").removeClass("active");
+						li.addClass("active");
+						panes.find(".tab-pane").removeClass("active");
+						panes.find(`#${tab.id}`).addClass("active");
+					})
+					.appendTo(li);
+				navItems.push({ li, link });
+				$('<div class="tab-pane" role="tabpanel">').attr("id", tab.id).appendTo(panes);
+			}
+			navItems[0].li.addClass("active");
+			panes.find(`#${importTab.id}`).addClass("active");
+			state.activeImportTab = state.activeImportTab || importTab.id;
+			if (state.activeImportTab === refTab.id) navItems[1].link.trigger("click");
+			renderImportPane(panes.find(`#${importTab.id}`), data);
+			renderReferencePane(panes.find(`#${refTab.id}`));
 		}
 
 		function renderError(error) {
@@ -267,46 +315,7 @@
 			}
 		}
 
-		function kpiCard(parent, label, valueText, valueClass, note) {
-			const card = $('<div class="inv-kpi">').appendTo(parent);
-			$('<div class="inv-kpi-label">').text(label).appendTo(card);
-			$('<div class="inv-kpi-value">').addClass(valueClass || "").text(valueText).appendTo(card);
-			if (note) $('<div class="inv-kpi-note">').text(note).appendTo(card);
-			return card;
-		}
-
-		function renderKpis(data) {
-			const values = data.values || {};
-			const perf = data.performance || {};
-			const base = values.base;
-			const grid = $('<div class="inv-kpis">').appendTo(root);
-			kpiCard(grid, __("Portfolio Value"), inv.formatMoney(values.total_value, base));
-			kpiCard(grid, __("YTD TWR"), inv.formatPercent(perf.twr_ytd), inv.signClass(perf.twr_ytd),
-				perf.snapshots < 2 ? __("Needs two daily snapshots") : null);
-			kpiCard(grid, __("YTD XIRR"),
-				perf.xirr_ytd === null || perf.xirr_ytd === undefined ? "—" : inv.formatPercent(perf.xirr_ytd),
-				inv.signClass(perf.xirr_ytd));
-			// Sharpe needs >=2 daily returns with variance; a flat or one-day
-			// series shows a dash, not a misleading zero.
-			kpiCard(grid, __("Sharpe (YTD)"),
-				perf.sharpe_ytd === null || perf.sharpe_ytd === undefined ? "—" : inv.num(perf.sharpe_ytd).toFixed(2),
-				inv.signClass(perf.sharpe_ytd),
-				perf.sharpe_ytd === null || perf.sharpe_ytd === undefined ? __("Needs varied daily snapshots") : null);
-			kpiCard(grid, __("Unrealized P&L"), inv.formatMoney(values.unrealized_pnl, base),
-				inv.signClass(values.unrealized_pnl));
-			// YTD realized P&L and income come from services.performance_summary
-			// (_period_totals); a dash only appears if an older server omits them.
-			const realized = perf.realized_pnl_ytd;
-			const income = perf.income_ytd;
-			kpiCard(grid, __("Realized P&L (YTD)"),
-				realized === null || realized === undefined ? "—" : inv.formatMoney(realized, base),
-				inv.signClass(realized));
-			kpiCard(grid, __("Income (YTD)"),
-				income === null || income === undefined ? "—" : inv.formatMoney(income, base),
-				inv.signClass(income));
-		}
-
-		function renderBenchmark(data) {
+		function renderBenchmark() {
 			const section = $('<section class="inv-section"></section>').appendTo(root);
 			$("<h2>").text(__("Compare to Benchmark")).appendTo(section);
 			const controls = $('<div class="inv-benchmark-controls">').appendTo(section);
@@ -319,30 +328,6 @@
 				$("<option>").attr("value", b.code).text(b.name).appendTo(select);
 			}
 			if (state.benchmark) select.val(state.benchmark);
-			if (inv.isManager()) {
-				$('<button type="button" class="btn btn-default btn-sm">')
-					.text(__("Refresh Prices"))
-					.on("click", async (e) => {
-						const btn = $(e.currentTarget).prop("disabled", true);
-						try {
-							const r = await call("refresh_benchmark_prices");
-							const updated = Object.keys(r || {}).filter((k) => r[k] !== null).length;
-							frappe.show_alert({
-								message: __("Benchmark prices updated: {0}", [updated]),
-								indicator: updated ? "green" : "orange",
-							});
-							if (state.benchmark) select.trigger("change");
-						} catch (error) {
-							frappe.show_alert({
-								message: __("Benchmark price refresh failed."),
-								indicator: "red",
-							});
-						} finally {
-							btn.prop("disabled", false);
-						}
-					})
-					.appendTo(controls);
-			}
 			const out = $('<div class="inv-benchmark-result">').appendTo(section);
 			if (!state.benchmark) {
 				$('<p class="inv-muted">')
@@ -372,22 +357,41 @@
 			});
 		}
 
+		/* Portfolio vs benchmark goes through frappe-charts (bundled with
+		 * Desk as window.frappe.Chart): a two-series line built by the
+		 * shared inv.benchmarkChartData helper. Numbers come only from the
+		 * API: null stays missing and the note carries the honest reason. */
 		function renderBenchmarkResult(out, r) {
 			out.empty();
-			const table = $('<table class="inv-table inv-benchmark-table">').appendTo(out);
-			const tbody = $("<tbody>").appendTo(table);
-			const row = (label, value, cls) => {
-				const tr = $("<tr>").appendTo(tbody);
-				$("<td>").text(label).appendTo(tr);
-				$("<td>").addClass("inv-num").addClass(cls || "").text(value).appendTo(tr);
-			};
-			row(__("{0} (YTD)", [r.benchmark_name || r.benchmark]), inv.formatPercent(r.benchmark_return_ytd),
-				inv.signClass(r.benchmark_return_ytd));
-			row(__("This portfolio (TWR, YTD)"), inv.formatPercent(r.portfolio_twr_ytd),
-				inv.signClass(r.portfolio_twr_ytd));
+			if (r.benchmark_return_ytd === null || r.benchmark_return_ytd === undefined) {
+				$('<p class="inv-muted">').text(r.note || __("No benchmark data for this period.")).appendTo(out);
+				return;
+			}
+			const mount = $('<div class="inv-benchmark-chart">').appendTo(out);
+			// frappe-charts is bundled with Desk as window.frappe.Chart; the
+			// window.Chart fallback keeps the harness and any non-Desk
+			// embedding honest about which constructor was used.
+			const ChartCtor = window.Chart || (window.frappe && window.frappe.Chart);
+			if (typeof ChartCtor !== "function") {
+				mount.text(__("Charts are unavailable in this Desk build."));
+				return;
+			}
+			try {
+				new ChartCtor(mount.get(0), {
+					title: __("Portfolio vs {0} (YTD %)", [r.benchmark_name || r.benchmark]),
+					type: "line",
+					height: 220,
+					axisOptions: { xIsSeries: true },
+					tooltipOptions: { formatTooltipY: (d) => `${d}%` },
+					data: inv.benchmarkChartData(r),
+				});
+			} catch (error) {
+				mount.text(__("The comparison could not be rendered."));
+			}
 			if (r.excess_return_ytd !== null && r.excess_return_ytd !== undefined) {
-				row(__("Excess vs benchmark"), inv.formatPercent(r.excess_return_ytd),
-					inv.signClass(r.excess_return_ytd));
+				$('<p class="inv-muted">')
+					.text(__("Excess vs benchmark: {0}", [inv.formatPercent(r.excess_return_ytd)]))
+					.appendTo(out);
 			}
 			if (r.note) $('<p class="inv-muted">').text(r.note).appendTo(out);
 			if (r.benchmark_currency && r.base_currency && r.benchmark_currency !== r.base_currency) {
@@ -395,74 +399,6 @@
 					.text(__("Benchmark converted from {0} to {1} at your FX rates.", [r.benchmark_currency, r.base_currency]))
 					.appendTo(out);
 			}
-		}
-
-		function renderUsage(data) {
-			const license = data.license || {};
-			const usage = data.usage || {};
-			const used = usage.asset_classes_used || [];
-			const max = license.max_asset_classes;
-			const check = usage.value_check;
-			const overClasses = max !== null && max !== undefined && used.length > max;
-			const overValue = !!(check && check.breached);
-			if (!overClasses && !overValue) return;
-			const row = $('<div class="inv-upsell" role="alert">').appendTo(root);
-			let message;
-			if (overClasses) {
-				message = __(
-					"This site tracks {0} asset classes ({1}); your license covers {2}. Existing holdings stay visible — recording securities in new asset classes needs a higher tier.",
-					[String(used.length), used.join(", "), String(max)]
-				);
-			} else if (check.reason === "missing_fx") {
-				message = __(
-					"Add an FX rate from {0} to {1} so the license's value cap can be checked; valuations continue meanwhile.",
-					[check.base_currency || "", check.value_currency || ""]
-				);
-			} else {
-				message = __(
-					"This portfolio's value is above your license's cap of {0} {1}. Tracking continues; contact your vendor to raise the cap.",
-					[check.max_value || "", check.value_currency || ""]
-				);
-			}
-			$("<span>").text(message).appendTo(row);
-			$("<a>")
-				.attr("href", "#inv-license")
-				.text(__("View license"))
-				.on("click", (e) => {
-					if (e && e.preventDefault) e.preventDefault();
-					const target = root.find("#inv-license");
-					const el = target && target.get ? target.get(0) : null;
-					if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth" });
-				})
-				.appendTo(row);
-		}
-
-		function renderAllocation(data) {
-			const values = data.values || {};
-			const allocation = values.allocation_by_class || {};
-			const entries = Object.entries(allocation)
-				.map(([label, pct]) => [label, inv.num(pct) || 0])
-				.sort((a, b) => b[1] - a[1]);
-			const section = $('<section class="inv-section"></section>').appendTo(root);
-			$("<h2>").text(__("Allocation")).appendTo(section);
-			$('<p class="inv-section-sub">')
-				.text(__("By asset class, % of portfolio value ({0}).", [values.base || ""]))
-				.appendTo(section);
-			if (!entries.length) {
-				$('<p class="inv-muted">').text(__("No priced holdings yet.")).appendTo(section);
-				return;
-			}
-			entries.forEach(([label, pct]) => {
-				const row = $('<div class="inv-alloc-row">').appendTo(section);
-				$('<span class="inv-alloc-label">').text(label).appendTo(row);
-				const track = $('<div class="inv-alloc-track">').appendTo(row);
-				$('<div class="inv-alloc-fill">')
-					.css("width", `${Math.min(100, Math.max(0, pct))}%`)
-					.attr("role", "img")
-					.attr("aria-label", `${label} ${pct}%`)
-					.appendTo(track);
-				$('<span class="inv-alloc-pct">').text(`${pct.toFixed(2)}%`).appendTo(row);
-			});
 		}
 
 		function holdingRows(data) {
@@ -617,7 +553,17 @@
 			state.syncing[conn.name] = true;
 			if (btn && btn.prop) btn.prop("disabled", true);
 			try {
-				await call("sync_now", { connection: conn.name });
+				const r = await call("sync_now", { connection: conn.name });
+				if (r && r.queued === false) {
+					frappe.show_alert({
+						message: r.note || __("A sync for {0} is already running.", [
+							inv.escape(conn.connection_name || conn.name),
+						]),
+						indicator: "orange",
+					});
+					startSyncPoll(conn);
+					return;
+				}
 				frappe.show_alert({
 					message: __("Sync queued for {0}; it runs in the background.", [
 						inv.escape(conn.connection_name || conn.name),
@@ -744,73 +690,238 @@
 			}
 		}
 
-		function renderLicense(data, parent) {
-			const license = data.license || { tier: "standard", status: "none" };
-			const section = $('<section class="inv-section inv-license" id="inv-license"></section>').appendTo(parent);
-			$("<h2>").text(__("License")).appendTo(section);
-			const tier = $('<div class="inv-license-tier">').appendTo(section);
-			if (license.status === "none" || !license.status) {
-				tier.text(__("Free tier"));
-				$('<div class="inv-license-meta">')
-					.text(
-						license.cloud_managed
-							? __("One asset class, free forever. Choose a paid plan in Frappe Cloud and it applies here automatically.")
-							: __("One asset class, free forever. Enter a license key to track more asset classes or lift a portfolio-value cap.")
-					)
-					.appendTo(section);
-			} else if (license.status === "active") {
-				tier.text(license.tier === "pro" ? __("Pro") : __("Standard"));
-				const limits = license.max_asset_classes === null || license.max_asset_classes === undefined
-					? __("unlimited asset classes")
-					: __("{0} asset class(es)", [String(license.max_asset_classes)]);
-				const cap = license.max_value
-					? ` ${__("Value capped at {0} {1}.", [String(license.max_value), license.value_currency || ""])}`
-					: "";
-				const origin = license.source === "cloud"
-					? __("From your Frappe Cloud plan {0}.", [license.cloud_plan || license.tier])
-					: __("Licensed to {0}.", [license.customer || __("Unknown customer")]);
-				const renews = license.source !== "cloud" && license.expires
-					? ` ${__("Renews or expires on {0}.", [inv.formatDate(license.expires)])}`
-					: "";
-				$('<div class="inv-license-meta">')
-					.text(origin + ` ${__("Covers {0}.", [limits])}` + cap + renews)
-					.appendTo(section);
-			} else if (license.status === "expired") {
-				tier.text(__("Free tier"));
-				$('<div class="inv-warn" role="alert">')
-					.text(__("License expired on {0}. The free tier's limits apply again; renew to restore your tier.", [inv.formatDate(license.expires)]))
-					.appendTo(section);
-			} else {
-				tier.text(__("Free tier"));
-				$('<div class="inv-warn" role="alert">')
-					.text(__("The stored license key is invalid. Enter a valid key to enable your tier."))
-					.appendTo(section);
+
+		function renderImportPane(pane, data) {
+			pane.empty();
+			const form = $('<div class="inv-import-form">').appendTo(pane);
+
+			// Target account: the import posts into the picked account, like
+			// manual events do. Defaults to this portfolio's first account.
+			const accountRow = $('<div class="inv-import-row">').appendTo(form);
+			$("<label>").attr("for", "inv-import-account").text(__("Investment Account")).appendTo(accountRow);
+			const accountSelect = $('<select class="form-control">')
+				.attr("id", "inv-import-account")
+				.attr("aria-label", __("Investment Account"))
+				.appendTo(accountRow);
+			// Accounts ride along on the dashboard payload (get_dashboard),
+			// filtered here to this portfolio like the manual-event dialog.
+			const accounts = (data.accounts || []).filter((a) => a.portfolio === state.portfolio);
+			for (const a of accounts) {
+				$("<option>").attr("value", a.name).text(a.account_name || a.name).appendTo(accountSelect);
 			}
-			if (license.cloud_managed && license.source !== "cloud" && license.cloud_note) {
-				$('<div class="inv-license-meta">').text(license.cloud_note).appendTo(section);
+			if (state.importAccount) accountSelect.val(state.importAccount);
+			if (!accountSelect.val() && accounts.length) {
+				accountSelect.val(accounts[0].name); // default to the first account
 			}
-			if (inv.isManager()) {
-				const actions = $('<div class="inv-license-actions">').appendTo(section);
-				if (license.cloud_managed) {
-					$('<button type="button" class="btn btn-default">')
-						.text(__("Refresh Plan"))
-						.on("click", async (event) => {
-							const button = $(event.currentTarget).prop("disabled", true);
-							try {
-								await call("refresh_license");
-								frappe.show_alert({ message: __("Plan refreshed from Frappe Cloud."), indicator: "green" });
-								load();
-							} finally {
-								button.prop("disabled", false);
-							}
-						})
-						.appendTo(actions);
+			accountSelect.on("change", () => {
+				state.importAccount = accountSelect.val() || null;
+				state.importPreview = null;
+				render();
+			});
+
+			// Cost-method surface: the selector documents which method will
+			// price the gains; the engine reads the portfolio setting.
+			const methodRow = $('<div class="inv-import-row">').appendTo(form);
+			$("<label>").attr("for", "inv-import-method").text(__("Cost Method")).appendTo(methodRow);
+			const methodSelect = $('<select class="form-control">')
+				.attr("id", "inv-import-method")
+				.attr("aria-label", __("Cost Method"))
+				.appendTo(methodRow);
+			for (const m of ["FIFO", "LIFO", "AVERAGE", "SPECIFIC"]) {
+				$("<option>").attr("value", m).text(m).appendTo(methodSelect);
+			}
+			const methodNote = $('<p class="inv-muted inv-import-method-note">').appendTo(methodRow);
+			const refreshMethod = async () => {
+				const account = accountSelect.val();
+				if (!account) {
+					methodNote.text(__("Pick an account to see its cost method."));
+					return;
 				}
-				$('<button type="button" class="btn btn-default">')
-					.text(__("Enter License Key"))
-					.on("click", () => showLicenseDialog())
-					.appendTo(actions);
+				try {
+					const info = await call("import_cost_method", { account });
+					methodSelect.val(info.effective || "FIFO");
+					methodNote.text(
+						info.portfolio_cost_method
+							? __("Gains for {0} use {1} (set on the portfolio).", [info.portfolio, info.effective])
+							: __("Gains use the default {0}. Set a method on the portfolio to override.", [info.effective || "FIFO"])
+					);
+				} catch (e) {
+					methodNote.text(__("The cost method could not be loaded."));
+				}
+			};
+			methodSelect.on("change", () => {
+				methodNote.text(__("The cost method lives on the portfolio — change it on the Portfolio form; gains use it on posting."));
+			});
+			refreshMethod();
+
+			// Template download (headers + one example row, served from the app).
+			const templateRow = $('<div class="inv-import-row">').appendTo(form);
+			$('<button type="button" class="btn btn-default btn-sm">')
+				.text(__("Download CSV Template"))
+				.on("click", async () => {
+					try {
+						const r = await call("import_template_url", {});
+						if (window.open) window.open(r.url, "_blank");
+					} catch (e) {
+						frappe.show_alert({ message: __("The template could not be loaded."), indicator: "red" });
+					}
+				})
+				.appendTo(templateRow);
+
+			// Drag-and-drop zone with a file-picker fallback. Files are read
+			// locally with FileReader; only the text is sent to the server.
+			const drop = $('<div class="inv-dropzone" tabindex="0" role="button">')
+				.attr("aria-label", __("Drop a statement CSV here, or choose a file"))
+				.appendTo(form);
+			$("<p>").text(__("Drop a statement CSV here, or choose a file.")).appendTo(drop);
+			const fileInput = $('<input type="file" accept=".csv,text/csv">')
+				.attr("aria-label", __("Choose a statement CSV file"))
+				.appendTo(drop);
+			const hint = state.importFileName
+				? __("Selected: {0}", [state.importFileName])
+				: __("Nothing selected yet.");
+			$('<p class="inv-muted inv-import-file">').text(hint).appendTo(drop);
+			const readFile = (file) => {
+				if (!file) return;
+				state.importFileName = file.name || "";
+				// window.FileReader in Desk; injectable in tests via the harness window.
+				const Ctor = window.FileReader || (typeof FileReader !== "undefined" ? FileReader : null);
+				if (!Ctor) {
+					frappe.show_alert({ message: __("File reading is unavailable here."), indicator: "red" });
+					return;
+				}
+				const reader = new Ctor();
+				reader.onload = () => {
+					state.importText = String(reader.result || "");
+					state.importPreview = null;
+					render();
+				};
+				reader.onerror = () => {
+					frappe.show_alert({ message: __("The file could not be read."), indicator: "red" });
+				};
+				reader.readAsText(file);
+			};
+			fileInput.on("change", (e) => {
+				const files = (e && e.target && e.target.files) || (fileInput.get(0) && fileInput.get(0).files);
+				if (files && files[0]) readFile(files[0]);
+			});
+			drop.on("dragover", (e) => { e.preventDefault(); drop.addClass("inv-dropzone-active"); });
+			drop.on("dragleave", () => drop.removeClass("inv-dropzone-active"));
+			drop.on("drop", (e) => {
+				e.preventDefault();
+				drop.removeClass("inv-dropzone-active");
+				const dt = e.originalEvent && e.originalEvent.dataTransfer;
+				if (dt && dt.files && dt.files[0]) readFile(dt.files[0]);
+			});
+
+			if (state.importText) {
+				renderImportPreview(pane, accountSelect.val());
 			}
+		}
+
+		// Preview counts + per-row errors first; the Post button appears only
+		// when the preview is clean. Posting routes through import_post, hence
+		// the same record_event dedupe as manual events.
+		async function renderImportPreview(pane, account) {
+			const box = $('<div class="inv-import-preview">').appendTo(pane);
+			$('<p class="inv-muted">').text(__("Checking…")).appendTo(box);
+			let preview = state.importPreview;
+			if (!preview) {
+				try {
+					preview = await call("import_preview", { account, csv_text: state.importText });
+					state.importPreview = preview;
+				} catch (e) {
+					box.empty();
+					$('<p class="inv-muted">')
+						.text((e && e.message) || __("The file could not be checked."))
+						.appendTo(box);
+					return;
+				}
+			}
+			box.empty();
+			const summary = $('<p class="inv-import-summary">')
+				.text(__("{0} rows: {1} valid, {2} with errors.", [preview.total_rows, preview.valid_rows, preview.error_rows]))
+				.appendTo(box);
+			if (preview.by_type && Object.keys(preview.by_type).length) {
+				$('<p class="inv-muted">')
+					.text(Object.entries(preview.by_type).map(([t, n]) => `${t}: ${n}`).join(" · "))
+					.appendTo(box);
+			}
+			if ((preview.errors || []).length) {
+				const wrap = $('<div class="inv-table-wrap">').appendTo(box);
+				const table = $('<table class="inv-table">').appendTo(wrap);
+				const thead = $("<thead>").appendTo(table);
+				const tr = $("<tr>").appendTo(thead);
+				$("<th>").attr("scope", "col").text(__("Row")).appendTo(tr);
+				$("<th>").attr("scope", "col").text(__("Error")).appendTo(tr);
+				const tbody = $("<tbody>").appendTo(table);
+				for (const err of preview.errors) {
+					const row = $("<tr>").appendTo(tbody);
+					$("<td>").addClass("inv-num").text(err.row).appendTo(row);
+					$("<td>").text(err.message).appendTo(row);
+				}
+				if (preview.batch) {
+					$('<p class="inv-muted">')
+						.text(__("Saved as Import Batch {0} — fix the file and check again.", [preview.batch]))
+						.appendTo(box);
+				}
+				return;
+			}
+			$('<button type="button" class="btn btn-primary">')
+				.text(__("Post {0} Events", [preview.valid_rows]))
+				.on("click", async (e) => {
+					const btn = $(e.currentTarget || e.target);
+					if (btn.prop) btn.prop("disabled", true);
+					try {
+						const r = await call("import_post", { account, csv_text: state.importText });
+						state.importText = null;
+						state.importFileName = "";
+						state.importPreview = null;
+						frappe.show_alert({
+							message: r.created === r.posted
+								? __("Posted {0} events.", [r.posted])
+								: __("Posted {0} events ({1} already existed).", [r.posted, r.posted - r.created]),
+							indicator: "green",
+						});
+						load();
+					} catch (err) {
+						frappe.show_alert({
+							message: (err && err.message) || __("Posting failed."),
+							indicator: "red",
+						});
+						if (btn.prop) btn.prop("disabled", false);
+					}
+				})
+				.appendTo(box);
+		}
+
+		function renderReferencePane(pane) {
+			pane.empty();
+			$('<p class="inv-section-sub">')
+				.text(__("Every row needs date, type and currency, plus the columns below."))
+				.appendTo(pane);
+			const box = $('<div class="inv-reference">').appendTo(pane);
+			$('<p class="inv-muted">').text(__("Loading…")).appendTo(box);
+			call("import_reference", {}).then((r) => {
+				box.empty();
+				const wrap = $('<div class="inv-table-wrap">').appendTo(box);
+				const table = $('<table class="inv-table">').appendTo(wrap);
+				const thead = $("<thead>").appendTo(table);
+				const tr = $("<tr>").appendTo(thead);
+				for (const label of [__("Operation"), __("Required Columns"), __("Optional Columns")]) {
+					$("<th>").attr("scope", "col").text(label).appendTo(tr);
+				}
+				const tbody = $("<tbody>").appendTo(table);
+				for (const row of (r && r.event_types) || []) {
+					const line = $("<tr>").appendTo(tbody);
+					$("<td>").text(row.type).appendTo(line);
+					$("<td>").text((row.required || []).join(", ")).appendTo(line);
+					$("<td>").text((row.optional || []).join(", ")).appendTo(line);
+				}
+			}).catch(() => {
+				box.empty();
+				$('<p class="inv-muted">').text(__("The reference could not be loaded.")).appendTo(box);
+			});
 		}
 
 		/* ------------------------------------------------------- dialogs */
@@ -850,23 +961,6 @@
 			dialog.show();
 		}
 
-		function showLicenseDialog() {
-			const dialog = new frappe.ui.Dialog({
-				title: __("Enter License Key"),
-				fields: [
-					{ fieldname: "license_key", label: __("License Key"), fieldtype: "Small Text", reqd: 0,
-						description: __("For sites outside Frappe Cloud. Paste the FINV1.… key you received; it is verified offline, and clearing the field returns to the free Standard tier. On Frappe Cloud your plan applies on its own and no key is needed.") },
-				],
-				primary_action_label: __("Save"),
-				primary_action: async (values) => {
-					await call("save_license", { license_key: values.license_key || "" });
-					dialog.hide();
-					frappe.show_alert({ message: __("License saved."), indicator: "green" });
-					load();
-				},
-			});
-			dialog.show();
-		}
 
 		function showEventDialog() {
 			const data = state.data || {};
@@ -898,6 +992,8 @@
 					description: __("Child shares received per parent share.") },
 				{ fieldname: "target_currency", label: __("Target Currency"), fieldtype: "Link", options: "Currency" },
 				{ fieldname: "target_amount", label: __("Target Amount"), fieldtype: "Float" },
+				{ fieldname: "target_account", label: __("Target Account"), fieldtype: "Link", options: "Investment Account",
+					description: __("Transfer Out destination. Must be in the same portfolio.") },
 				{ fieldname: "notes", label: __("Notes"), fieldtype: "Small Text" },
 			];
 			const dialog = new frappe.ui.Dialog({
